@@ -17,9 +17,14 @@ const Node = union(enum) {
         count: u8,
     },
     hash: Hash,
+    empty: ?bool,
 
-    fn insert(self: Node, key: Key, value: Slot) !void {
-        return switch (self) {
+    fn new() @This() {
+        return @This(){ .empty = null };
+    }
+
+    fn insert(self: *Node, key: Key, value: Slot, allocator: *std.mem.Allocator) !void {
+        return switch (self.*) {
             .hash => error.InsertIntoHash,
             else => error.NodeTypeNotSupported,
         };
@@ -28,5 +33,5 @@ const Node = union(enum) {
 
 test "inserting into hash raises an error" {
     var root = Node{ .hash = [_]u8{0} ** 32 };
-    try testing.expectError(error.InsertIntoHash, root.insert([_]u8{0} ** 32, [_]u8{0} ** 32));
+    try testing.expectError(error.InsertIntoHash, root.insert([_]u8{0} ** 32, [_]u8{0} ** 32, testing.allocator));
 }
