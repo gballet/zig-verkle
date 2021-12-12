@@ -55,6 +55,25 @@ const Node = union(enum) {
             else => error.NodeTypeNotSupported,
         };
     }
+
+    fn tear_down(self: *Node, allocator: *Allocator) void {
+        switch (self.*) {
+            .empty => {},
+            .last_level => |ll| {
+                // TODO need to check that this value has been
+                // allocated on the heap and not on the stack.
+                //for (ll.values) |v| {
+                //if (v != null) {
+                //allocator.free(v.?);
+                //}
+                //}
+
+                allocator.destroy(ll);
+            },
+            // TODO complete list
+            else => @panic("unsupported node type in tear_down"),
+        }
+    }
 };
 
 test "inserting into hash raises an error" {
@@ -65,10 +84,11 @@ test "inserting into hash raises an error" {
 }
 
 test "insert into empty tree" {
-    var root_ = Node{ .empty = .{} };
+    var root_ = Node.new();
     var root: *Node = &root_;
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    defer root.tear_down(testing.allocator);
 
     switch (root.*) {
         Node.last_level => |ll| {
