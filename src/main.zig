@@ -30,7 +30,6 @@ const Node = union(enum) {
 
     fn insert(self: *Node, key: Key, value: *Slot, allocator: *Allocator) !void {
         return switch (self.*) {
-            .hash => error.InsertIntoHash,
             .empty => {
                 const slot = key[31];
                 var ll = try allocator.create(LastLevelNode);
@@ -43,6 +42,7 @@ const Node = union(enum) {
                 std.mem.copy(u8, ll.key[0..], key[0..31]);
                 self.* = @unionInit(Node, "last_level", ll);
             },
+            .hash => error.InsertIntoHash,
             .last_level => |ll| {
                 const diffidx = std.mem.indexOfDiff(u8, ll.key[0..], key[0..31]);
                 var br = try allocator.create(BranchNode);
