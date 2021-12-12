@@ -13,12 +13,12 @@ const LastLevelNode = struct {
 };
 
 const Node = union(enum) {
-    last_level: LastLevelNode,
     branch: struct {
         children: [256]?*Node,
         depth: u8,
         count: u8,
     },
+    last_level: *LastLevelNode,
     hash: Hash,
     empty: ?bool,
 
@@ -31,10 +31,9 @@ const Node = union(enum) {
             .hash => error.InsertIntoHash,
             .empty => {
                 const slot = key[31];
-                var ll = LastLevelNode{
-                    .values = [_]?*Slot{null} ** 256,
-                    .key = [_]u8{0} ** 31,
-                };
+                var ll = try allocator.create(LastLevelNode);
+                ll.values = [_]?*Slot{null} ** 256;
+                ll.key = [_]u8{0} ** 31;
                 // Do not copy the value for now. This might cause some
                 // heisenbugs in the future, as immutability isn't enforced.
                 // It will do for now.
@@ -42,24 +41,34 @@ const Node = union(enum) {
                 std.mem.copy(u8, ll.key[0..], key[0..31]);
                 self.* = @unionInit(Node, "last_level", ll);
             },
+            .last_level => |ll| {
+                const diffidx = std.mem.indexOfDiff(u8, ll.key[0..], key[0..31]);
+                var br = try allocator.create(BranchNode);
+                br.children = [_]?*Node{null} ** 256;
+                br.depth = 0;
+                br.count = 2;
+                self.* = @unionInit(Node, "branch", br);
+            },
             else => error.NodeTypeNotSupported,
         };
     }
 };
 
 test "inserting into hash raises an error" {
-    var root = Node{ .hash = [_]u8{0} ** 32 };
+    var root_ = Node{ .hash = [_]u8{0} ** 32 };
+    var root: *Node = &root_;
     var value = [_]u8{0} ** 32;
     try testing.expectError(error.InsertIntoHash, root.insert([_]u8{0} ** 32, &value, testing.allocator));
 }
 
 test "insert into empty tree" {
-    var root = Node.new();
+    var root_ = Node{ .empty = .{} };
+    var root: *Node = &root_;
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{0} ** 32, &value, testing.allocator);
 
-    switch (root) {
-        Node.last_level => |*ll| {
+    switch (root.*) {
+        Node.last_level => |ll| {
             for (ll.values) |v, i| {
                 if (i == 0) {
                     try testing.expect(v != null);
