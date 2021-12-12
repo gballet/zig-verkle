@@ -23,10 +23,11 @@ const Node = union(enum) {
     branch: *BranchNode,
     hash: Hash,
 
-    fn new() @This() {
-        return @This(){ .empty = null };
-    }
     empty: struct {},
+
+    fn new() @This() {
+        return @This(){ .empty = .{} };
+    }
 
     fn insert(self: *Node, key: Key, value: *Slot, allocator: *Allocator) !void {
         return switch (self.*) {
