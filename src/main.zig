@@ -22,11 +22,11 @@ const Node = union(enum) {
     last_level: *LastLevelNode,
     branch: *BranchNode,
     hash: Hash,
-    empty: ?bool,
 
     fn new() @This() {
         return @This(){ .empty = null };
     }
+    empty: struct {},
 
     fn insert(self: *Node, key: Key, value: *Slot, allocator: *Allocator) !void {
         return switch (self.*) {
