@@ -12,13 +12,15 @@ const LastLevelNode = struct {
     key: Stem,
 };
 
+const BranchNode = struct {
+    children: [256]?*Node,
+    depth: u8,
+    count: u8,
+};
+
 const Node = union(enum) {
-    branch: struct {
-        children: [256]?*Node,
-        depth: u8,
-        count: u8,
-    },
     last_level: *LastLevelNode,
+    branch: *BranchNode,
     hash: Hash,
     empty: ?bool,
 
