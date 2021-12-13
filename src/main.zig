@@ -13,7 +13,7 @@ const LastLevelNode = struct {
 };
 
 const BranchNode = struct {
-    children: [256]?Node,
+    children: [256]Node,
     depth: u8,
     count: u8,
 };
@@ -59,7 +59,7 @@ const Node = union(enum) {
                 }
 
                 var br = try allocator.create(BranchNode);
-                br.children = [_]?Node{null} ** 256;
+                br.children = [_]Node{Node{ .empty = .{} }} ** 256;
                 br.depth = depth;
                 br.count = 2;
                 br.children[ll.key[br.depth]] = Node{ .last_level = ll };
@@ -71,7 +71,7 @@ const Node = union(enum) {
                     br.children[key[br.depth]] = Node{ .last_level = ll2 };
                 }
                 self.* = @unionInit(Node, "branch", br);
-                return br.children[key[br.depth]].?.insert_with_depth(key, value, allocator, depth + 1);
+                return br.children[key[br.depth]].insert_with_depth(key, value, allocator, depth + 1);
             },
             else => error.NodeTypeNotSupported,
         };
@@ -92,10 +92,8 @@ const Node = union(enum) {
                 allocator.destroy(ll);
             },
             .branch => |br| {
-                for (br.children) |child, i| {
-                    if (child != null) {
-                        br.children[i].?.tear_down(allocator);
-                    }
+                for (br.children) |_, i| {
+                    br.children[i].tear_down(allocator);
                 }
 
                 allocator.destroy(br);
@@ -167,22 +165,19 @@ test "insert into a last_level node, difference in stem" {
     switch (root.*) {
         Node.branch => |br| {
             for (br.children) |child, i| {
-                if (i < 2) {
-                    try testing.expect(child != null);
-                    switch (child.?) {
-                        Node.last_level => |ll| {
-                            for (ll.values) |v, j| {
-                                if (j == 0) {
-                                    try testing.expect(v != null);
-                                } else {
-                                    try testing.expect(v == null);
-                                }
+                switch (child) {
+                    Node.last_level => |ll| {
+                        try testing.expect(i < 2);
+                        for (ll.values) |v, j| {
+                            if (j == 0) {
+                                try testing.expect(v != null);
+                            } else {
+                                try testing.expect(v == null);
                             }
-                        },
-                        else => return error.InvalidNodeType,
-                    }
-                } else {
-                    try testing.expect(child == null);
+                        }
+                    },
+                    Node.empty => try testing.expect(i >= 2),
+                    else => return error.InvalidNodeType,
                 }
             }
         },
