@@ -149,3 +149,37 @@ test "insert into a last_level node, difference in suffix" {
         else => return error.InvalidNodeType,
     }
 }
+
+test "insert into a last_level node, difference in stem" {
+    var root_ = Node.new();
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator);
+    defer root.tear_down(testing.allocator);
+
+    switch (root.*) {
+        Node.branch => |br| {
+            for (br.children) |child, i| {
+                if (i < 2) {
+                    try testing.expect(child != null);
+                    switch (child.?) {
+                        Node.last_level => |ll| {
+                            for (ll.values) |v, j| {
+                                if (j == 0) {
+                                    try testing.expect(v != null);
+                                } else {
+                                    try testing.expect(v == null);
+                                }
+                            }
+                        },
+                        else => return error.InvalidNodeType,
+                    }
+                } else {
+                    try testing.expect(child == null);
+                }
+            }
+        },
+        else => return error.InvalidNodeType,
+    }
+}
