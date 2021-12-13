@@ -92,6 +92,12 @@ const Node = union(enum) {
                 allocator.destroy(ll);
             },
             .branch => |br| {
+                for (br.children) |child, i| {
+                    if (child != null) {
+                        br.children[i].?.tear_down(allocator);
+                    }
+                }
+
                 allocator.destroy(br);
             },
             // TODO complete list
