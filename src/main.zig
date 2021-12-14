@@ -184,3 +184,29 @@ test "insert into a last_level node, difference in stem" {
         else => return error.InvalidNodeType,
     }
 }
+
+test "insert into a last_level node, difference in last byte of stem" {
+    var root_ = Node.new();
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    try root.insert([_]u8{0} ** 30 ++ [2]u8{ 1, 0 }, &value, testing.allocator);
+    defer root.tear_down(testing.allocator);
+
+    var br: *BranchNode = root.branch;
+    while (true) {
+        if (br.depth < 30) {
+            for (br.children) |child, i| {
+                if (i == 0) try testing.expect(child == .branch) else try testing.expect(child == .empty);
+            }
+            br = br.children[0].branch;
+        } else if (br.depth == 30) {
+            for (br.children) |child, i| {
+                if (i < 2) try testing.expect(child == .last_level) else try testing.expect(child == .empty);
+            }
+            break;
+        } else {
+            try testing.expect(false);
+        }
+    }
+}
