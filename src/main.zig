@@ -41,7 +41,7 @@ const Node = union(enum) {
                 ll.values = [_]?*Slot{null} ** 256;
                 ll.key = [_]u8{0} ** 31;
                 std.mem.copy(u8, ll.key[0..], key[0..31]);
-                ll.values[slot] = try allocator.create([32]u8);
+                ll.values[slot] = try allocator.create(Slot);
                 std.mem.copy(u8, ll.values[slot].?[0..], value[0..]);
                 self.* = @unionInit(Node, "last_level", ll);
             },
