@@ -40,21 +40,20 @@ const Node = union(enum) {
                 var ll = try allocator.create(LastLevelNode);
                 ll.values = [_]?*Slot{null} ** 256;
                 ll.key = [_]u8{0} ** 31;
-                // Do not copy the value for now. This might cause some
-                // heisenbugs in the future, as immutability isn't enforced.
-                // It will do for now.
-                ll.values[slot] = value;
                 std.mem.copy(u8, ll.key[0..], key[0..31]);
+                ll.values[slot] = try allocator.create([32]u8);
+                std.mem.copy(u8, ll.values[slot].?[0..], value[0..]);
                 self.* = @unionInit(Node, "last_level", ll);
             },
             .hash => error.InsertIntoHash,
             .last_level => |ll| {
-                // Check if the keys are the same, if so, then just place the value
+                // Check if the stems are the same, if so, then just place the value
                 // in the corresponding slot, as the final extension tree has been
                 // reached.
                 const diffidx = std.mem.indexOfDiff(u8, ll.key[0..], key[0..31]);
                 if (diffidx == null) {
-                    ll.values[key[31]] = value;
+                    ll.values[key[31]] = try allocator.create(Slot);
+                    std.mem.copy(u8, ll.values[key[31]].?[0..], value[0..]);
                     return;
                 }
 
@@ -81,13 +80,11 @@ const Node = union(enum) {
         switch (self.*) {
             .empty => {},
             .last_level => |ll| {
-                // TODO need to check that this value has been
-                // allocated on the heap and not on the stack.
-                //for (ll.values) |v| {
-                //if (v != null) {
-                //allocator.free(v.?);
-                //}
-                //}
+                for (ll.values) |v| {
+                    if (v != null) {
+                        allocator.free(v.?);
+                    }
+                }
 
                 allocator.destroy(ll);
             },
