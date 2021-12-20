@@ -72,7 +72,17 @@ const Node = union(enum) {
                 self.* = @unionInit(Node, "branch", br);
                 return br.children[key[br.depth]].insert_with_depth(key, value, allocator, depth + 1);
             },
-            else => error.NodeTypeNotSupported,
+            .branch => |br| switch (br.children[key[br.depth]]) {
+                .empty => {
+                    var ll = try allocator.create(LastLevelNode);
+                    ll.key = [_]u8{0} ** 31;
+                    std.mem.copy(u8, ll.key[0..], key[0..31]);
+                    ll.values = [_]?*Slot{null} ** 256;
+                    br.children[key[br.depth]] = Node{ .last_level = ll };
+                },
+                .hash => return error.InsertIntoHash,
+                else => br.children[key[br.depth]].insert(key, value, allocator),
+            },
         };
     }
 
@@ -204,5 +214,22 @@ test "insert into a last_level node, difference in last byte of stem" {
         } else {
             try testing.expect(false);
         }
+    }
+}
+
+test "insert into a branch node" {
+    var root_ = Node.new();
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator);
+    defer root.tear_down(testing.allocator);
+
+    var br: *BranchNode = root.branch;
+    try testing.expect(br.children[0] == .last_level);
+    try testing.expect(br.children[1] == .last_level);
+    var i: usize = 2;
+    while (i < 256) : (i += 1) {
+        try testing.expect(br.children[i] == .empty);
     }
 }
