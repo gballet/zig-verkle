@@ -18,6 +18,17 @@ const BranchNode = struct {
     count: u8,
 };
 
+fn newll(key: Key, value: *Slot, allocator: *Allocator) !*LastLevelNode {
+    const slot = key[31];
+    var ll = try allocator.create(LastLevelNode);
+    ll.values = [_]?*Slot{null} ** 256;
+    ll.key = [_]u8{0} ** 31;
+    std.mem.copy(u8, ll.key[0..], key[0..31]);
+    ll.values[slot] = try allocator.create(Slot);
+    std.mem.copy(u8, ll.values[slot].?[0..], value[0..]);
+    return ll;
+}
+
 const Node = union(enum) {
     last_level: *LastLevelNode,
     branch: *BranchNode,
@@ -36,14 +47,7 @@ const Node = union(enum) {
     fn insert_with_depth(self: *Node, key: Key, value: *Slot, allocator: *Allocator, depth: u8) !void {
         return switch (self.*) {
             .empty => {
-                const slot = key[31];
-                var ll = try allocator.create(LastLevelNode);
-                ll.values = [_]?*Slot{null} ** 256;
-                ll.key = [_]u8{0} ** 31;
-                std.mem.copy(u8, ll.key[0..], key[0..31]);
-                ll.values[slot] = try allocator.create(Slot);
-                std.mem.copy(u8, ll.values[slot].?[0..], value[0..]);
-                self.* = @unionInit(Node, "last_level", ll);
+                self.* = @unionInit(Node, "last_level", try newll(key, value, allocator));
             },
             .hash => error.InsertIntoHash,
             .last_level => |ll| {
@@ -62,27 +66,14 @@ const Node = union(enum) {
                 br.depth = depth;
                 br.count = 2;
                 br.children[ll.key[br.depth]] = Node{ .last_level = ll };
-                if (ll.key[br.depth] != key[br.depth]) {
-                    var ll2 = try allocator.create(LastLevelNode);
-                    ll2.key = [_]u8{0} ** 31;
-                    std.mem.copy(u8, ll2.key[0..], key[0..31]);
-                    ll2.values = [_]?*Slot{null} ** 256;
-                    br.children[key[br.depth]] = Node{ .last_level = ll2 };
-                }
                 self.* = @unionInit(Node, "branch", br);
+                // Recurse into the child, if this is empty then it will be turned
+                // into a last_level node in the recursing .empty case, and if the
+                // next byte in the key are the same, it will recurse into another
+                // .last_level case, potentially doing so over the whole stem.
                 return br.children[key[br.depth]].insert_with_depth(key, value, allocator, depth + 1);
             },
-            .branch => |br| switch (br.children[key[br.depth]]) {
-                .empty => {
-                    var ll = try allocator.create(LastLevelNode);
-                    ll.key = [_]u8{0} ** 31;
-                    std.mem.copy(u8, ll.key[0..], key[0..31]);
-                    ll.values = [_]?*Slot{null} ** 256;
-                    br.children[key[br.depth]] = Node{ .last_level = ll };
-                },
-                .hash => return error.InsertIntoHash,
-                else => br.children[key[br.depth]].insert(key, value, allocator),
-            },
+            .branch => |br| br.children[key[br.depth]].insert(key, value, allocator),
         };
     }
 
