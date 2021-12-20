@@ -103,6 +103,7 @@ const Node = union(enum) {
     fn commitment(self: *Node) !Hash {
         switch (self.*) {
             .empty => return [_]u8{0} ** 32,
+            .hash => return self,
             else => return error.InvalidNodeType,
         }
     }
