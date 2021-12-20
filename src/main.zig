@@ -99,6 +99,12 @@ const Node = union(enum) {
             .hash => {},
         }
     }
+
+    fn commitment(self: *Node) !Hash {
+        switch (self.*) {
+            else => return error.InvalidNodeType,
+        }
+    }
 };
 
 test "inserting into hash raises an error" {
