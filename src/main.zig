@@ -95,8 +95,7 @@ const Node = union(enum) {
 
                 allocator.destroy(br);
             },
-            // TODO complete list
-            else => @panic("unsupported node type in tear_down"),
+            .hash => {},
         }
     }
 };
