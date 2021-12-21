@@ -1,15 +1,60 @@
 const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
+// Use Edwards25519 at the moment, since bandersnatch is currently
+// unavailable, and Edwards is the only curve available in zig, that
+// both supports addition and serializes to 32 bytes.
+const curve = std.crypto.ecc.Edwards25519;
 
 const Slot = [32]u8;
 const Key = [32]u8;
 const Stem = [31]u8;
 const Hash = [32]u8;
 
+fn generateInsecure(comptime n: usize) ![n]curve {
+    var r: [n]curve = undefined;
+    var i: usize = 0;
+    var v: [32]u8 = undefined;
+    while (i < n) : (i += 1) {
+        std.mem.writeIntSliceBig(usize, v[0..], i + 2);
+        r[i] = try curve.mul(curve.basePoint, v);
+    }
+
+    return r;
+}
+
 const LastLevelNode = struct {
     values: [256]?*Slot,
     key: Stem,
+
+    fn computeSuffixNodeCommitment(srs: [256]curve, values: []?*Slot) !Hash {
+        var multiplier = [_]u8{0} ** 32;
+        var i: usize = 0;
+        var ret = curve.identityElement;
+        while (i < values.len) : (i += 1) {
+            if (values[i] != null) {
+                std.mem.copy(u8, multiplier[16..], values[i].?[0..16]);
+                ret = curve.add(ret, try curve.mul(srs[2 * i], multiplier));
+                std.mem.copy(u8, multiplier[16..], values[i].?[16..]);
+                ret = curve.add(ret, try curve.mul(srs[2 * i + 1], multiplier));
+            }
+        }
+
+        return ret.toBytes();
+    }
+
+    fn computeCommitment(self: *LastLevelNode) !Hash {
+        // TODO find a way to generate this at compile/startup
+        // time, without running into the 1000 backwards branches
+        // issue.
+        const srs = try generateInsecure(256);
+        const c1 = try computeSuffixNodeCommitment(srs, self.values[0..128]);
+        const c2 = try computeSuffixNodeCommitment(srs, self.values[128..]);
+        var stem = [_]u8{0} ** 32;
+        std.mem.copy(u8, stem[1..], self.key[0..]);
+        const res = curve.add(curve.add(srs[0], try curve.mul(srs[1], stem)), curve.add(try curve.mul(srs[2], c2), try curve.mul(srs[3], c2)));
+        return res.toBytes();
+    }
 };
 
 const BranchNode = struct {
@@ -101,11 +146,12 @@ const Node = union(enum) {
     }
 
     fn commitment(self: *Node) !Hash {
-        switch (self.*) {
-            .empty => return [_]u8{0} ** 32,
-            .hash => return self,
-            else => return error.InvalidNodeType,
-        }
+        return switch (self.*) {
+            .empty => [_]u8{0} ** 32,
+            .hash => |h| h,
+            .last_level => |ll| ll.computeCommitment(),
+            else => error.InvalidNodeType,
+        };
     }
 };
 
@@ -231,4 +277,12 @@ test "insert into a branch node" {
     while (i < 256) : (i += 1) {
         try testing.expect(br.children[i] == .empty);
     }
+}
+
+test "compute root commitment of a last_level node" {
+    var root_ = Node.new();
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    _ = try root.commitment();
 }
