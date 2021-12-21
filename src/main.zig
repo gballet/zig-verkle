@@ -34,9 +34,18 @@ const LastLevelNode = struct {
         while (i < values.len) : (i += 1) {
             if (values[i] != null) {
                 std.mem.copy(u8, multiplier[16..], values[i].?[0..16]);
+                multiplier[15] = 1; // set the leaf marker
                 ret = curve.add(ret, try curve.mul(srs[2 * i], multiplier));
-                std.mem.copy(u8, multiplier[16..], values[i].?[16..]);
-                ret = curve.add(ret, try curve.mul(srs[2 * i + 1], multiplier));
+                multiplier[15] = 0; // clear the leaf marker
+                // Multiplying by 0 will give the identity element, and
+                // the Edwards25519 won't allow this result. Since it's
+                // a no-op anyway, skip it.
+                for (multiplier[16..]) |v| {
+                    if (v != 0) {
+                        std.mem.copy(u8, multiplier[16..], values[i].?[16..]);
+                        ret = curve.add(ret, try curve.mul(srs[2 * i + 1], multiplier));
+                    }
+                }
             }
         }
 
@@ -283,6 +292,7 @@ test "compute root commitment of a last_level node" {
     var root_ = Node.new();
     var root = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    try root.insert([_]u8{1} ** 32, &value, testing.allocator);
+    defer root.tear_down(testing.allocator);
     _ = try root.commitment();
 }
