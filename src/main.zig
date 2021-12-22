@@ -83,6 +83,20 @@ const BranchNode = struct {
     children: [256]Node,
     depth: u8,
     count: u8,
+
+    fn computeCommitment(self: *const BranchNode) !Hash {
+        // TODO find a way to generate this at compile/startup
+        // time, without running into the 1000 backwards branches
+        // issue.
+        const srs = try generateInsecure(256);
+        var res = curve.identityElement;
+        for (self.children) |child, i| {
+            if (child != .empty) {
+                res = curve.add(res, try curve.mul(srs[i], try child.commitment()));
+            }
+        }
+        return res.toBytes();
+    }
 };
 
 fn newll(key: Key, value: *Slot, allocator: *Allocator) !*LastLevelNode {
@@ -172,7 +186,7 @@ const Node = union(enum) {
             .empty => [_]u8{0} ** 32,
             .hash => |h| h,
             .last_level => |ll| ll.computeCommitment(),
-            else => error.InvalidNodeType,
+            .branch => |br| br.computeCommitment(),
         };
     }
 };
@@ -315,6 +329,16 @@ test "compute root commitment of a last_level node, with 0 key" {
     var root = &root_;
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    defer root.tear_down(testing.allocator);
+    _ = try root.commitment();
+}
+
+test "compute root commitment of a branch node" {
+    var root_ = Node.new();
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    try root.insert([_]u8{1} ** 32, &value, testing.allocator);
     defer root.tear_down(testing.allocator);
     _ = try root.commitment();
 }
