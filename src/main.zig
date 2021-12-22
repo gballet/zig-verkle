@@ -27,7 +27,7 @@ const LastLevelNode = struct {
     values: [256]?*Slot,
     key: Stem,
 
-    fn computeSuffixNodeCommitment(srs: [256]curve, values: []?*Slot) !Hash {
+    fn computeSuffixNodeCommitment(srs: [256]curve, values: []const ?*Slot) !Hash {
         var multiplier = [_]u8{0} ** 32;
         var i: usize = 0;
         var ret = curve.identityElement;
@@ -61,7 +61,7 @@ const LastLevelNode = struct {
         return true;
     }
 
-    fn computeCommitment(self: *LastLevelNode) !Hash {
+    fn computeCommitment(self: *const LastLevelNode) !Hash {
         // TODO find a way to generate this at compile/startup
         // time, without running into the 1000 backwards branches
         // issue.
@@ -167,7 +167,7 @@ const Node = union(enum) {
         }
     }
 
-    fn commitment(self: *Node) !Hash {
+    fn commitment(self: *const Node) !Hash {
         return switch (self.*) {
             .empty => [_]u8{0} ** 32,
             .hash => |h| h,
