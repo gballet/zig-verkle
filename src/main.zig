@@ -52,6 +52,15 @@ const LastLevelNode = struct {
         return ret.toBytes();
     }
 
+    fn isZero(stem: []const u8) bool {
+        for (stem) |v| {
+            if (v != 0)
+                return false;
+        }
+
+        return true;
+    }
+
     fn computeCommitment(self: *LastLevelNode) !Hash {
         // TODO find a way to generate this at compile/startup
         // time, without running into the 1000 backwards branches
@@ -61,7 +70,11 @@ const LastLevelNode = struct {
         const c2 = try computeSuffixNodeCommitment(srs, self.values[128..]);
         var stem = [_]u8{0} ** 32;
         std.mem.copy(u8, stem[1..], self.key[0..]);
-        const res = curve.add(curve.add(srs[0], try curve.mul(srs[1], stem)), curve.add(try curve.mul(srs[2], c2), try curve.mul(srs[3], c2)));
+        var res = curve.add(try curve.mul(srs[2], c2), try curve.mul(srs[3], c2));
+        res = curve.add(res, srs[0]);
+        if (!isZero(stem[0..])) {
+            res = curve.add(res, try curve.mul(srs[1], stem));
+        }
         return res.toBytes();
     }
 };
@@ -293,6 +306,15 @@ test "compute root commitment of a last_level node" {
     var root = &root_;
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{1} ** 32, &value, testing.allocator);
+    defer root.tear_down(testing.allocator);
+    _ = try root.commitment();
+}
+
+test "compute root commitment of a last_level node, with 0 key" {
+    var root_ = Node.new();
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
     defer root.tear_down(testing.allocator);
     _ = try root.commitment();
 }
