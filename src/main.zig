@@ -90,7 +90,7 @@ const BranchNode = struct {
         // issue.
         const srs = try generateInsecure(256);
         var res = curve.identityElement;
-        for (self.children) |child, i| {
+        for (self.children, 0..) |child, i| {
             if (child != .empty) {
                 res = curve.add(res, try curve.mul(srs[i], try child.commitment()));
             }
@@ -171,7 +171,7 @@ const Node = union(enum) {
                 allocator.destroy(ll);
             },
             .branch => |br| {
-                for (br.children) |_, i| {
+                for (br.children, 0..) |_, i| {
                     br.children[i].tear_down(allocator);
                 }
 
@@ -207,7 +207,7 @@ test "insert into empty tree" {
 
     switch (root.*) {
         Node.last_level => |ll| {
-            for (ll.values) |v, i| {
+            for (ll.values, 0..) |v, i| {
                 if (i == 0) {
                     try testing.expect(v != null);
                 } else {
@@ -229,7 +229,7 @@ test "insert into a last_level node, difference in suffix" {
 
     switch (root.*) {
         Node.last_level => |ll| {
-            for (ll.values) |v, i| {
+            for (ll.values, 0..) |v, i| {
                 if (i < 2) {
                     try testing.expect(v != null);
                 } else {
@@ -251,11 +251,11 @@ test "insert into a last_level node, difference in stem" {
 
     switch (root.*) {
         Node.branch => |br| {
-            for (br.children) |child, i| {
+            for (br.children, 0..) |child, i| {
                 switch (child) {
                     Node.last_level => |ll| {
                         try testing.expect(i < 2);
-                        for (ll.values) |v, j| {
+                        for (ll.values, 0..) |v, j| {
                             if (j == 0) {
                                 try testing.expect(v != null);
                             } else {
@@ -283,12 +283,12 @@ test "insert into a last_level node, difference in last byte of stem" {
     var br: *BranchNode = root.branch;
     while (true) {
         if (br.depth < 30) {
-            for (br.children) |child, i| {
+            for (br.children, 0..) |child, i| {
                 if (i == 0) try testing.expect(child == .branch) else try testing.expect(child == .empty);
             }
             br = br.children[0].branch;
         } else if (br.depth == 30) {
-            for (br.children) |child, i| {
+            for (br.children, 0..) |child, i| {
                 if (i < 2) try testing.expect(child == .last_level) else try testing.expect(child == .empty);
             }
             break;
