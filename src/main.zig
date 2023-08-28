@@ -84,7 +84,7 @@ const BranchNode = struct {
     depth: u8,
     count: u8,
 
-    fn computeCommitment(self: *const BranchNode) !Hash {
+    fn computeCommitment(self: *const BranchNode) anyerror!Hash {
         // TODO find a way to generate this at compile/startup
         // time, without running into the 1000 backwards branches
         // issue.
@@ -99,7 +99,7 @@ const BranchNode = struct {
     }
 };
 
-fn newll(key: Key, value: *Slot, allocator: *Allocator) !*LastLevelNode {
+fn newll(key: Key, value: *Slot, allocator: Allocator) !*LastLevelNode {
     const slot = key[31];
     var ll = try allocator.create(LastLevelNode);
     ll.values = [_]?*Slot{null} ** 256;
@@ -121,11 +121,11 @@ const Node = union(enum) {
         return @This(){ .empty = .{} };
     }
 
-    fn insert(self: *Node, key: Key, value: *Slot, allocator: *Allocator) !void {
+    fn insert(self: *Node, key: Key, value: *Slot, allocator: Allocator) !void {
         return self.insert_with_depth(key, value, allocator, 0);
     }
 
-    fn insert_with_depth(self: *Node, key: Key, value: *Slot, allocator: *Allocator, depth: u8) !void {
+    fn insert_with_depth(self: *Node, key: Key, value: *Slot, allocator: Allocator, depth: u8) anyerror!void {
         return switch (self.*) {
             .empty => {
                 self.* = @unionInit(Node, "last_level", try newll(key, value, allocator));
@@ -158,7 +158,7 @@ const Node = union(enum) {
         };
     }
 
-    fn tear_down(self: *Node, allocator: *Allocator) void {
+    fn tear_down(self: *Node, allocator: Allocator) void {
         switch (self.*) {
             .empty => {},
             .last_level => |ll| {
