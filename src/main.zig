@@ -70,7 +70,7 @@ const LastLevelNode = struct {
         const c2 = try computeSuffixNodeCommitment(srs, self.values[128..]);
         var stem = [_]u8{0} ** 32;
         std.mem.copy(u8, stem[1..], self.key[0..]);
-        var res = curve.add(try curve.mul(srs[2], c2), try curve.mul(srs[3], c2));
+        var res = curve.add(try curve.mul(srs[2], c1), try curve.mul(srs[3], c2));
         res = curve.add(res, srs[0]);
         if (!isZero(stem[0..])) {
             res = curve.add(res, try curve.mul(srs[1], stem));
