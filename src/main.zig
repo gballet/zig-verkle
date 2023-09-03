@@ -373,7 +373,6 @@ test "get inserted value from a tree" {
     _ = try testing.expect(val != null);
     _ = try testing.expect(std.mem.eql(u8, val.?, &value1));
     val = try root.get(key2);
-    std.debug.print("{any}\n", .{val});
     _ = try testing.expect(val != null);
     _ = try testing.expect(std.mem.eql(u8, val.?, &value2));
 }
