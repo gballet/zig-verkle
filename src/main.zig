@@ -125,6 +125,21 @@ const Node = union(enum) {
         return self.insert_with_depth(key, value, allocator, 0);
     }
 
+    fn get(self: *Node, key: Key) !?*Slot {
+        return switch (self.*) {
+            .empty => null,
+            .hash => error.ReadFromHash,
+            .last_level => |ll| {
+                if (!std.mem.eql(u8, key[0..31], ll.key[0..31])) {
+                    return null;
+                }
+
+                return ll.values[key[31]];
+            },
+            .branch => |br| return br.children[key[br.depth]].get(key),
+        };
+    }
+
     fn insert_with_depth(self: *Node, key: Key, value: *Slot, allocator: Allocator, depth: u8) anyerror!void {
         return switch (self.*) {
             .empty => {
@@ -341,4 +356,24 @@ test "compute root commitment of a branch node" {
     try root.insert([_]u8{1} ** 32, &value, testing.allocator);
     defer root.tear_down(testing.allocator);
     _ = try root.commitment();
+}
+
+test "get inserted value from a tree" {
+    var root_ = Node.new();
+    var root = &root_;
+    var key1 = [_]u8{0} ** 32;
+    var value1 = [_]u8{11} ** 32;
+    try root.insert(key1, &value1, testing.allocator);
+    var key2 = [1]u8{1} ++ [_]u8{0} ** 31;
+    var value2 = [_]u8{22} ** 32;
+    try root.insert(key2, &value2, testing.allocator);
+    defer root.tear_down(testing.allocator);
+
+    var val = try root.get(key1);
+    _ = try testing.expect(val != null);
+    _ = try testing.expect(std.mem.eql(u8, val.?, &value1));
+    val = try root.get(key2);
+    std.debug.print("{any}\n", .{val});
+    _ = try testing.expect(val != null);
+    _ = try testing.expect(std.mem.eql(u8, val.?, &value2));
 }
