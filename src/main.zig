@@ -23,6 +23,13 @@ fn generateInsecure(comptime n: usize) ![n]curve {
     return r;
 }
 
+const ProofItems = struct {
+    fn merge(self: *ProofItems, other: *const ProofItems) !void {
+        _ = other;
+        _ = self;
+    }
+};
+
 const LastLevelNode = struct {
     values: [256]?*Slot,
     key: Stem,
@@ -77,6 +84,26 @@ const LastLevelNode = struct {
         }
         return res.toBytes();
     }
+
+    fn get_proof_items(self: *const LastLevelNode, keys: []Key) !ProofItems {
+        var has_c1 = false;
+        var has_c2 = false;
+        var proof_items = ProofItems{};
+        for (keys) |key| {
+            if (key[31] < 128 and !has_c1) {
+                has_c1 = true;
+                // add c1 to proof item
+
+            }
+            if (key[31] >= 128 and !has_c2) {
+                has_c2 = true;
+                // add c2 to proof item
+            }
+            _ = self.values[key[31]];
+        }
+
+        return proof_items;
+    }
 };
 
 const BranchNode = struct {
@@ -96,6 +123,22 @@ const BranchNode = struct {
             }
         }
         return res.toBytes();
+    }
+
+    fn get_proof_items(self: *const BranchNode, keys: []Key) !ProofItems {
+        var groupstart = 0;
+        // TODO initialize with my proof info
+        var proof_items = ProofItems{};
+        while (groupstart < keys.len) {
+            var groupend = groupstart;
+            while (groupend < keys.len and keys[groupend][self.depth] == keys[groupstart][self.depth]) {
+                groupend += 1;
+            }
+
+            const child_proof_items = self.children[keys[groupstart][self.depth]].get_proof_items(keys[groupstart..groupend]);
+
+            proof_items.merge(child_proof_items);
+        }
     }
 };
 
@@ -202,6 +245,15 @@ const Node = union(enum) {
             .hash => |h| h,
             .last_level => |ll| ll.computeCommitment(),
             .branch => |br| br.computeCommitment(),
+        };
+    }
+
+    // assume that keys are sorted
+    fn get_proof_items(self: *const Node, keys: [][32]u8) !ProofItems {
+        return switch (self.*) {
+            .branch => |br| br.get_proof_items(keys),
+            .last_level => |ll| ll.get_proof_items(keys),
+            _ => error.NotImplemented,
         };
     }
 };
