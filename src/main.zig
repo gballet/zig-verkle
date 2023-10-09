@@ -41,29 +41,29 @@ const LastLevelNode = struct {
     values: [256]?*Slot,
     key: Stem,
 
-    fn computeSuffixNodeCommitment(srs: [256]curve, values: []const ?*Slot) !Hash {
-        var multiplier = [_]u8{0} ** 32;
-        var i: usize = 0;
-        var ret = curve.identityElement;
-        while (i < values.len) : (i += 1) {
-            if (values[i] != null) {
-                std.mem.copy(u8, multiplier[16..], values[i].?[0..16]);
-                multiplier[15] = 1; // set the leaf marker
-                ret = curve.add(ret, try curve.mul(srs[2 * i], multiplier));
-                multiplier[15] = 0; // clear the leaf marker
-                // Multiplying by 0 will give the identity element, and
-                // the Edwards25519 won't allow this result. Since it's
-                // a no-op anyway, skip it.
-                for (multiplier[16..]) |v| {
-                    if (v != 0) {
-                        std.mem.copy(u8, multiplier[16..], values[i].?[16..]);
-                        ret = curve.add(ret, try curve.mul(srs[2 * i + 1], multiplier));
-                    }
-                }
+    fn computeSuffixNodeCommitment(crs: *CRS, values: []const ?*Slot) !Element {
+        if (values.len != 128) {
+            return error.InvalidValueArrayLength;
+        }
+
+        var vals: CRS_Domain = undefined;
+        for (values, 0..) |value, i| {
+            if (value != null) {
+                var data: [Fr.BytesSize]u8 = [_]u8{0} ** Fr.BytesSize;
+
+                // lsb
+                copy(u8, data[16..], value[16..]);
+                data[15] = 1; // leaf marker
+                vals[2 * i] = Fr.fromBytes(data);
+
+                // msb
+                copy(u8, data[16..], value[0..16]);
+                data[15] = 0; // clear leaf marker
+                vals[2 * i] = Fr.fromBytes(data);
             }
         }
 
-        return ret.toBytes();
+        return crs.commit(values);
     }
 
     fn isZero(stem: []const u8) bool {
@@ -75,21 +75,22 @@ const LastLevelNode = struct {
         return true;
     }
 
-    fn computeCommitment(self: *const LastLevelNode) !Hash {
-        // TODO find a way to generate this at compile/startup
-        // time, without running into the 1000 backwards branches
-        // issue.
-        const srs = try generateInsecure(256);
-        const c1 = try computeSuffixNodeCommitment(srs, self.values[0..128]);
-        const c2 = try computeSuffixNodeCommitment(srs, self.values[128..]);
-        var stem = [_]u8{0} ** 32;
+    fn computeCommitment(self: *const LastLevelNode, crs: *CRS) !Element {
+        var vals: CRS_Domain = undefined;
+
+        vals[0] = Fr.fromInteger(2);
+
+        var stem = [_]u8{0} ** Fr.BytesSize;
         std.mem.copy(u8, stem[1..], self.key[0..]);
-        var res = curve.add(try curve.mul(srs[2], c1), try curve.mul(srs[3], c2));
-        res = curve.add(res, srs[0]);
-        if (!isZero(stem[0..])) {
-            res = curve.add(res, try curve.mul(srs[1], stem));
-        }
-        return res.toBytes();
+        vals[1] = Fr.fromBytes(stem);
+
+        const c1 = try computeSuffixNodeCommitment(crs, self.values[0..128]);
+        const c2 = try computeSuffixNodeCommitment(crs, self.values[128..]);
+
+        vals[2] = c1.mapToScalarField();
+        vals[3] = c2.mapToScalarField();
+
+        return crs.commit(vals);
     }
 
     fn get_proof_items(self: *const LastLevelNode, keys: []Key) !ProofItems {
