@@ -5,6 +5,13 @@ const Allocator = std.mem.Allocator;
 // unavailable, and Edwards is the only curve available in zig, that
 // both supports addition and serializes to 32 bytes.
 const curve = std.crypto.ecc.Edwards25519;
+const verkle_crypto = @import("verkle-crypto");
+const banderwagon = verkle_crypto.banderwagon;
+const Element = banderwagon.Element;
+const Fr = banderwagon.Fr;
+const CRS = verkle_crypto.crs.CRS;
+const CRS_Domain = verkle_crypto.crs.Domain;
+const copy = std.mem.copy;
 
 const Slot = [32]u8;
 const Key = [32]u8;
@@ -435,9 +442,6 @@ test "get inserted value from a tree" {
 }
 
 test "check verkle-crypto can be imported" {
-    const verkle_crypto = @import("verkle-crypto");
-    const banderwagon = verkle_crypto.banderwagon;
-    const Element = banderwagon.Element;
     const expect = testing.expect;
 
     var point = Element.generator();
