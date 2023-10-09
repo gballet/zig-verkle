@@ -159,6 +159,7 @@ const Node = union(enum) {
     hash: Hash,
 
     empty: struct {},
+    unresolved: struct {},
 
     fn new() @This() {
         return @This(){ .empty = .{} };
@@ -180,6 +181,7 @@ const Node = union(enum) {
                 return ll.values[key[31]];
             },
             .branch => |br| return br.children[key[br.depth]].get(key),
+            .unresolved => error.ReadFromUnresolved,
         };
     }
 
@@ -189,6 +191,7 @@ const Node = union(enum) {
                 self.* = @unionInit(Node, "last_level", try newll(key, value, allocator));
             },
             .hash => error.InsertIntoHash,
+            .unresolved => error.InsertIntoUnresolved,
             .last_level => |ll| {
                 // Check if the stems are the same, if so, then just place the value
                 // in the corresponding slot, as the final extension tree has been
@@ -236,6 +239,7 @@ const Node = union(enum) {
                 allocator.destroy(br);
             },
             .hash => {},
+            .unresolved => {},
         }
     }
 
@@ -245,6 +249,7 @@ const Node = union(enum) {
             .hash => |h| h,
             .last_level => |ll| ll.computeCommitment(),
             .branch => |br| br.computeCommitment(),
+            .unresolved => error.CannotComputeUnresolvedCommitment,
         };
     }
 
