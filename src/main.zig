@@ -428,3 +428,18 @@ test "get inserted value from a tree" {
     _ = try testing.expect(val != null);
     _ = try testing.expect(std.mem.eql(u8, val.?, &value2));
 }
+
+test "check verkle-crypto can be imported" {
+    const verkle_crypto = @import("verkle-crypto");
+    const banderwagon = verkle_crypto.banderwagon;
+    const Element = banderwagon.Element;
+    const expect = testing.expect;
+
+    var point = Element.generator();
+
+    try expect(Element.equal(point, Element.generator()));
+
+    Element.double(&point, point);
+
+    try expect(!Element.equal(point, Element.generator()));
+}
