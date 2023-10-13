@@ -46,7 +46,7 @@ const LastLevelNode = struct {
             return error.InvalidValueArrayLength;
         }
 
-        var vals: CRS_Domain = undefined;
+        var vals: [256]Fr = undefined;
         for (values, 0..) |value, i| {
             if (value != null) {
                 var data: [Fr.BytesSize]u8 = [_]u8{0} ** Fr.BytesSize;
@@ -76,7 +76,7 @@ const LastLevelNode = struct {
     }
 
     fn computeCommitment(self: *const LastLevelNode, crs: *CRS) !Element {
-        var vals: CRS_Domain = undefined;
+        var vals: [256]Fr = undefined;
 
         vals[0] = Fr.fromInteger(2);
 
