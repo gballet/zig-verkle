@@ -3,8 +3,8 @@
     .version = "0.0.1-beta-0",
     .dependencies = .{
         .@"verkle-crypto" = .{
-            .url = "https://github.com/gballet/verkle-crypto/archive/refs/tags/v0.1.2.tar.gz",
-            .hash = "12200e8b045e04dd4ac6751568a2a01e8043ef602fe452c0ddd316992a856c97ee67",
+            .url = "https://github.com/gballet/verkle-crypto/archive/refs/tags/v0.1.3.tar.gz",
+            .hash = "1220d5cae11c7608071dba78e6bda1591755c7d9b2e718e9e3213a6f266ffdd39e1e",
         },
     },
 }
