@@ -119,18 +119,16 @@ const BranchNode = struct {
     depth: u8,
     count: u8,
 
-    fn computeCommitment(self: *const BranchNode) anyerror!Hash {
-        // TODO find a way to generate this at compile/startup
-        // time, without running into the 1000 backwards branches
-        // issue.
-        const srs = try generateInsecure(256);
-        var res = curve.identityElement;
+    fn computeCommitment(self: *const BranchNode, crs: *CRS) anyerror!Element {
+        var vals: [256]Fr = undefined;
+
         for (self.children, 0..) |child, i| {
             if (child != .empty) {
-                res = curve.add(res, try curve.mul(srs[i], try child.commitment()));
+                const point = child.commitment(crs);
+                vals[i] = point.mapToScalarField();
             }
         }
-        return res.toBytes();
+        return crs.commit(vals);
     }
 
     fn get_proof_items(self: *const BranchNode, keys: []Key) !ProofItems {
@@ -251,12 +249,12 @@ const Node = union(enum) {
         }
     }
 
-    fn commitment(self: *const Node) !Hash {
+    fn commitment(self: *const Node, crs: *CRS) !Element {
         return switch (self.*) {
-            .empty => [_]u8{0} ** 32,
-            .hash => |h| h,
-            .last_level => |ll| ll.computeCommitment(),
-            .branch => |br| br.computeCommitment(),
+            .empty => Element.identity(),
+            .hash => |_| error.NeedToRewordHashedNodes,
+            .last_level => |ll| ll.computeCommitment(crs),
+            .branch => |br| br.computeCommitment(crs),
             .unresolved => error.CannotComputeUnresolvedCommitment,
         };
     }
@@ -396,31 +394,37 @@ test "insert into a branch node" {
 }
 
 test "compute root commitment of a last_level node" {
+    var crs = try CRS.init(testing.allocator);
+    defer CRS.deinit(&crs);
     var root_ = Node.new();
     var root = &root_;
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{1} ** 32, &value, testing.allocator);
     defer root.tear_down(testing.allocator);
-    _ = try root.commitment();
+    _ = try root.commitment(&crs);
 }
 
 test "compute root commitment of a last_level node, with 0 key" {
+    var crs = try CRS.init(testing.allocator);
+    defer CRS.deinit(&crs);
     var root_ = Node.new();
     var root = &root_;
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{0} ** 32, &value, testing.allocator);
     defer root.tear_down(testing.allocator);
-    _ = try root.commitment();
+    _ = try root.commitment(&crs);
 }
 
 test "compute root commitment of a branch node" {
+    var crs = try CRS.init(testing.allocator);
+    defer CRS.deinit(&crs);
     var root_ = Node.new();
     var root = &root_;
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{0} ** 32, &value, testing.allocator);
     try root.insert([_]u8{1} ** 32, &value, testing.allocator);
     defer root.tear_down(testing.allocator);
-    _ = try root.commitment();
+    _ = try root.commitment(&crs);
 }
 
 test "get inserted value from a tree" {
