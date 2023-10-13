@@ -52,18 +52,18 @@ const LastLevelNode = struct {
                 var data: [Fr.BytesSize]u8 = [_]u8{0} ** Fr.BytesSize;
 
                 // lsb
-                copy(u8, data[16..], value[16..]);
+                copy(u8, data[16..], value.?[16..]);
                 data[15] = 1; // leaf marker
                 vals[2 * i] = Fr.fromBytes(data);
 
                 // msb
-                copy(u8, data[16..], value[0..16]);
+                copy(u8, data[16..], value.?[0..16]);
                 data[15] = 0; // clear leaf marker
                 vals[2 * i] = Fr.fromBytes(data);
             }
         }
 
-        return crs.commit(values);
+        return crs.commit(vals[0..]);
     }
 
     fn isZero(stem: []const u8) bool {
@@ -124,7 +124,7 @@ const BranchNode = struct {
 
         for (self.children, 0..) |child, i| {
             if (child != .empty) {
-                const point = child.commitment(crs);
+                const point = try child.commitment(crs);
                 vals[i] = point.mapToScalarField();
             }
         }
