@@ -18,18 +18,6 @@ const Key = [32]u8;
 const Stem = [31]u8;
 const Hash = [32]u8;
 
-fn generateInsecure(comptime n: usize) ![n]curve {
-    var r: [n]curve = undefined;
-    var i: usize = 0;
-    var v: [32]u8 = undefined;
-    while (i < n) : (i += 1) {
-        std.mem.writeIntSliceBig(usize, v[0..], i + 2);
-        r[i] = try curve.mul(curve.basePoint, v);
-    }
-
-    return r;
-}
-
 const ProofItems = struct {
     fn merge(self: *ProofItems, other: *const ProofItems) !void {
         _ = other;
@@ -90,7 +78,7 @@ const LastLevelNode = struct {
         vals[2] = c1.mapToScalarField();
         vals[3] = c2.mapToScalarField();
 
-        return crs.commit(vals);
+        return crs.commit(vals[0..]);
     }
 
     fn get_proof_items(self: *const LastLevelNode, keys: []Key) !ProofItems {
@@ -128,7 +116,7 @@ const BranchNode = struct {
                 vals[i] = point.mapToScalarField();
             }
         }
-        return crs.commit(vals);
+        return crs.commit(vals[0..]);
     }
 
     fn get_proof_items(self: *const BranchNode, keys: []Key) !ProofItems {
@@ -395,7 +383,7 @@ test "insert into a branch node" {
 
 test "compute root commitment of a last_level node" {
     var crs = try CRS.init(testing.allocator);
-    defer CRS.deinit(&crs);
+    defer crs.deinit();
     var root_ = Node.new();
     var root = &root_;
     var value = [_]u8{0} ** 32;
@@ -406,7 +394,7 @@ test "compute root commitment of a last_level node" {
 
 test "compute root commitment of a last_level node, with 0 key" {
     var crs = try CRS.init(testing.allocator);
-    defer CRS.deinit(&crs);
+    defer crs.deinit();
     var root_ = Node.new();
     var root = &root_;
     var value = [_]u8{0} ** 32;
@@ -417,7 +405,7 @@ test "compute root commitment of a last_level node, with 0 key" {
 
 test "compute root commitment of a branch node" {
     var crs = try CRS.init(testing.allocator);
-    defer CRS.deinit(&crs);
+    defer crs.deinit();
     var root_ = Node.new();
     var root = &root_;
     var value = [_]u8{0} ** 32;
