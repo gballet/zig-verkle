@@ -252,7 +252,7 @@ const Node = union(enum) {
     fn commitment(self: *const Node, crs: *CRS) !Element {
         return switch (self.*) {
             .empty => Element.identity(),
-            .hash => |_| error.NeedToRewordHashedNodes,
+            .hash => |_| error.NeedToReworkHashedNodes,
             .last_level => |ll| ll.computeCommitment(crs),
             .branch => |br| br.computeCommitment(crs),
             .unresolved => error.CannotComputeUnresolvedCommitment,
