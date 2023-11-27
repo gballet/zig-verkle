@@ -283,7 +283,7 @@ const Node = union(enum) {
             .unresolved => {
                 sofar = try std.fmt.allocPrint(allocator, "{}\n{} [label=\"?\"]", .{ sofar, me });
             },
-            _ => {}, // ignore other node types for now
+            else => {}, // ignore other node types for now
         }
         if (parent.len > 0) {
             sofar = try std.fmt.allocPrint(allocator, "{} {}\n{} -> {}", .{ sofar, me, parent, me });
