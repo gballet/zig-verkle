@@ -371,10 +371,11 @@ test "insert into a last_level node, difference in suffix" {
 test "insert into a last_level node, difference in stem" {
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
-    try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator);
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
 
     switch (root.*) {
@@ -401,11 +402,13 @@ test "insert into a last_level node, difference in stem" {
 }
 
 test "insert into a last_level node, difference in last byte of stem" {
-    var root_ = Node.new();
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
-    try root.insert([_]u8{0} ** 30 ++ [2]u8{ 1, 0 }, &value, testing.allocator);
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([_]u8{0} ** 30 ++ [2]u8{ 1, 0 }, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
 
     var br: *BranchNode = root.branch;
@@ -427,11 +430,13 @@ test "insert into a last_level node, difference in last byte of stem" {
 }
 
 test "insert into a branch node" {
-    var root_ = Node.new();
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
-    try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator);
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
 
     var br: *BranchNode = root.branch;
