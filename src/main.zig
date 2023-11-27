@@ -262,14 +262,14 @@ const Node = union(enum) {
         var sofar: []u8 = "";
         switch (self.*) {
             .branch => |br| {
-                sofar = std.fmt.allocPrint(allocator, "{} [label=\"I: {}\"]\n", .{ me, hash });
+                sofar = std.fmt.allocPrint(allocator, "{}\n{} [label=\"I: {}\"]\n", .{ sofar, me, hash });
                 for (br.children, 0..) |child, childidx| {
                     const child_path = std.fmt.allocPrint(allocator, "{}{}", .{ me, childidx });
                     sofar = std.fmt.allocPrint(allocator, "{}\n{}", .{ sofar, child.toDot(allocator, child_path, me) });
                 }
             },
             .last_level => |ll| {
-                sofar = std.fmt.allocPrint(allocator, "{} [label=\"I: {}\nS: {}\"]\n", .{ me, hash, ll.stem });
+                sofar = std.fmt.allocPrint(allocator, "{}\n{} [label=\"I: {}\nS: {}\"]\n", .{ sofar, me, hash, ll.stem });
                 for (ll.values, 0..) |val, validx| {
                     if (val) |value| {
                         sofar = std.fmt.allocPrint(allocator, "{}\n{} [label=\"{}\"]\n{} -> value{}{}", .{ sofar, me, value.*, me, path, validx });
