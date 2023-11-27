@@ -259,15 +259,15 @@ const Node = union(enum) {
         const hash = self.commitment().mapToScalarField();
         const me = std.fmt.allocPrint(allocator, "internal{s}", .{path});
         var sofar: []u8 = std.fmt.allocPrint(allocator, "{}\n{} [label=\"I: {}\"]", .{ me, hash });
-        if (parent.len > 0) {
-            sofar = std.fmt.allocPrint(allocator, "{} {}", .{ sofar, me });
-        }
         switch (self.*) {
             .branch => |br| for (br.children, 0..) |child, childidx| {
                 const child_path = std.fmt.allocPrint(allocator, "{}{}", .{ me, childidx });
                 sofar = std.fmt.allocPrint(allocator, "{}\n{}", .{ sofar, child.toDot(allocator, child_path, me) });
             },
             _ => {}, // ignore other node types for now
+        }
+        if (parent.len > 0) {
+            sofar = std.fmt.allocPrint(allocator, "{} {}\n{} -> {}", .{ sofar, me, parent, me });
         }
 
         return std.fmt.allocPrint(allocator, "digraph {\n {}\n}", .{sofar});
