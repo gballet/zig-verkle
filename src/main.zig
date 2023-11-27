@@ -147,6 +147,12 @@ fn newll(key: Key, value: *Slot, allocator: Allocator) !*LastLevelNode {
     return ll;
 }
 
+var global_crs: CRS = undefined;
+
+pub fn init() void {
+    global_crs = CRS.init();
+}
+
 const Node = union(enum) {
     last_level: *LastLevelNode,
     branch: *BranchNode,
