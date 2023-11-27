@@ -255,6 +255,7 @@ const Node = union(enum) {
             _ => error.NotImplemented,
         };
     }
+
     fn toDot(self: *const Node, allocator: Allocator, path: []const u8, parent: []const u8) ![]const u8 {
         const hash = self.commitment().mapToScalarField();
         const me = std.fmt.allocPrint(allocator, "{}{s}", .{ @typeName(self), path });
@@ -275,6 +276,8 @@ const Node = union(enum) {
                     }
                 }
             },
+            .hash => {
+                sofar = std.fmt.allocPrint(allocator, "{}\n{} [label=\"H: {}\"]", .{ sofar, me, hash });
             },
             _ => {}, // ignore other node types for now
         }
