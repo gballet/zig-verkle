@@ -28,6 +28,7 @@ const ProofItems = struct {
 const LastLevelNode = struct {
     values: [256]?*Slot,
     key: Stem,
+    crs: *CRS,
 
     fn computeSuffixNodeCommitment(crs: *CRS, values: []const ?*Slot) !Element {
         if (values.len != 128) {
@@ -63,7 +64,7 @@ const LastLevelNode = struct {
         return true;
     }
 
-    fn computeCommitment(self: *const LastLevelNode, crs: *CRS) !Element {
+    fn computeCommitment(self: *const LastLevelNode) !Element {
         var vals: [256]Fr = undefined;
 
         vals[0] = Fr.fromInteger(2);
@@ -72,13 +73,13 @@ const LastLevelNode = struct {
         std.mem.copy(u8, stem[1..], self.key[0..]);
         vals[1] = Fr.fromBytes(stem);
 
-        const c1 = try computeSuffixNodeCommitment(crs, self.values[0..128]);
-        const c2 = try computeSuffixNodeCommitment(crs, self.values[128..]);
+        const c1 = try computeSuffixNodeCommitment(self.crs, self.values[0..128]);
+        const c2 = try computeSuffixNodeCommitment(self.crs, self.values[128..]);
 
         vals[2] = c1.mapToScalarField();
         vals[3] = c2.mapToScalarField();
 
-        return crs.commit(vals[0..]);
+        return self.crs.commit(vals[0..]);
     }
 
     fn get_proof_items(self: *const LastLevelNode, keys: []Key) !ProofItems {
@@ -106,17 +107,18 @@ const BranchNode = struct {
     children: [256]Node,
     depth: u8,
     count: u8,
+    crs: *CRS,
 
-    fn computeCommitment(self: *const BranchNode, crs: *CRS) anyerror!Element {
+    fn computeCommitment(self: *const BranchNode) anyerror!Element {
         var vals: [256]Fr = undefined;
 
         for (self.children, 0..) |child, i| {
             if (child != .empty) {
-                const point = try child.commitment(crs);
+                const point = try child.commitment();
                 vals[i] = point.mapToScalarField();
             }
         }
-        return crs.commit(vals[0..]);
+        return self.crs.commit(vals[0..]);
     }
 
     fn get_proof_items(self: *const BranchNode, keys: []Key) !ProofItems {
@@ -136,7 +138,7 @@ const BranchNode = struct {
     }
 };
 
-fn newll(key: Key, value: *Slot, allocator: Allocator) !*LastLevelNode {
+fn newll(key: Key, value: *Slot, allocator: Allocator, crs: *CRS) !*LastLevelNode {
     const slot = key[31];
     var ll = try allocator.create(LastLevelNode);
     ll.values = [_]?*Slot{null} ** 256;
@@ -144,13 +146,8 @@ fn newll(key: Key, value: *Slot, allocator: Allocator) !*LastLevelNode {
     std.mem.copy(u8, ll.key[0..], key[0..31]);
     ll.values[slot] = try allocator.create(Slot);
     std.mem.copy(u8, ll.values[slot].?[0..], value[0..]);
+    ll.crs = crs;
     return ll;
-}
-
-var global_crs: CRS = undefined;
-
-pub fn init() void {
-    global_crs = CRS.init();
 }
 
 const Node = union(enum) {
@@ -161,12 +158,21 @@ const Node = union(enum) {
     empty: struct {},
     unresolved: struct {},
 
-    fn new() @This() {
-        return @This(){ .empty = .{} };
+    fn new(allocator: Allocator, crs: *CRS) !@This() {
+        var children: [256]Node = undefined;
+        for (children, 0..) |_, idx| {
+            children[idx] = Node{ .empty = .{} };
+        }
+        var br = try allocator.create(BranchNode);
+        br.crs = crs;
+        br.depth = 0;
+        br.count = 0;
+        br.children = children;
+        return @This(){ .branch = br };
     }
 
-    fn insert(self: *Node, key: Key, value: *Slot, allocator: Allocator) !void {
-        return self.insert_with_depth(key, value, allocator, 0);
+    fn insert(self: *Node, key: Key, value: *Slot, allocator: Allocator, crs: *CRS) !void {
+        return self.insert_with_depth(key, value, allocator, 0, crs);
     }
 
     fn get(self: *Node, key: Key) !?*Slot {
@@ -185,10 +191,10 @@ const Node = union(enum) {
         };
     }
 
-    fn insert_with_depth(self: *Node, key: Key, value: *Slot, allocator: Allocator, depth: u8) anyerror!void {
+    fn insert_with_depth(self: *Node, key: Key, value: *Slot, allocator: Allocator, depth: u8, crs: *CRS) anyerror!void {
         return switch (self.*) {
             .empty => {
-                self.* = @unionInit(Node, "last_level", try newll(key, value, allocator));
+                self.* = @unionInit(Node, "last_level", try newll(key, value, allocator, crs));
             },
             .hash => error.InsertIntoHash,
             .unresolved => error.InsertIntoUnresolved,
@@ -208,14 +214,15 @@ const Node = union(enum) {
                 br.depth = depth;
                 br.count = 2;
                 br.children[ll.key[br.depth]] = Node{ .last_level = ll };
+                br.crs = crs;
                 self.* = @unionInit(Node, "branch", br);
                 // Recurse into the child, if this is empty then it will be turned
                 // into a last_level node in the recursing .empty case, and if the
                 // next byte in the key are the same, it will recurse into another
                 // .last_level case, potentially doing so over the whole stem.
-                return br.children[key[br.depth]].insert_with_depth(key, value, allocator, depth + 1);
+                return br.children[key[br.depth]].insert_with_depth(key, value, allocator, depth + 1, crs);
             },
-            .branch => |br| br.children[key[br.depth]].insert(key, value, allocator),
+            .branch => |br| br.children[key[br.depth]].insert(key, value, allocator, br.crs),
         };
     }
 
@@ -243,12 +250,12 @@ const Node = union(enum) {
         }
     }
 
-    fn commitment(self: *const Node, crs: *CRS) !Element {
+    fn commitment(self: *const Node) !Element {
         return switch (self.*) {
             .empty => Element.identity(),
             .hash => |_| error.NeedToReworkHashedNodes,
-            .last_level => |ll| ll.computeCommitment(crs),
-            .branch => |br| br.computeCommitment(crs),
+            .last_level => |ll| ll.computeCommitment(),
+            .branch => |br| br.computeCommitment(),
             .unresolved => error.CannotComputeUnresolvedCommitment,
         };
     }
@@ -300,17 +307,21 @@ const Node = union(enum) {
 };
 
 test "inserting into hash raises an error" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
     var root_ = Node{ .hash = [_]u8{0} ** 32 };
     var root: *Node = &root_;
     var value = [_]u8{0} ** 32;
-    try testing.expectError(error.InsertIntoHash, root.insert([_]u8{0} ** 32, &value, testing.allocator));
+    try testing.expectError(error.InsertIntoHash, root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs));
 }
 
 test "insert into empty tree" {
-    var root_ = Node.new();
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root: *Node = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
 
     switch (root.*) {
@@ -328,11 +339,13 @@ test "insert into empty tree" {
 }
 
 test "insert into a last_level node, difference in suffix" {
-    var root_ = Node.new();
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
-    try root.insert([_]u8{0} ** 31 ++ [1]u8{1}, &value, testing.allocator);
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([_]u8{0} ** 31 ++ [1]u8{1}, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
 
     switch (root.*) {
@@ -350,7 +363,8 @@ test "insert into a last_level node, difference in suffix" {
 }
 
 test "insert into a last_level node, difference in stem" {
-    var root_ = Node.new();
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
     var root = &root_;
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{0} ** 32, &value, testing.allocator);
@@ -426,46 +440,48 @@ test "insert into a branch node" {
 test "compute root commitment of a last_level node" {
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
-    var root_ = Node.new();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{1} ** 32, &value, testing.allocator);
+    try root.insert([_]u8{1} ** 32, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
-    _ = try root.commitment(&crs);
+    _ = try root.commitment();
 }
 
 test "compute root commitment of a last_level node, with 0 key" {
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
-    var root_ = Node.new();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
-    _ = try root.commitment(&crs);
+    _ = try root.commitment();
 }
 
 test "compute root commitment of a branch node" {
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
-    var root_ = Node.new();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
     var value = [_]u8{0} ** 32;
-    try root.insert([_]u8{0} ** 32, &value, testing.allocator);
-    try root.insert([_]u8{1} ** 32, &value, testing.allocator);
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([_]u8{1} ** 32, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
-    _ = try root.commitment(&crs);
+    _ = try root.commitment();
 }
 
 test "get inserted value from a tree" {
-    var root_ = Node.new();
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
     var key1 = [_]u8{0} ** 32;
     var value1 = [_]u8{11} ** 32;
-    try root.insert(key1, &value1, testing.allocator);
+    try root.insert(key1, &value1, testing.allocator, &crs);
     var key2 = [1]u8{1} ++ [_]u8{0} ** 31;
     var value2 = [_]u8{22} ** 32;
-    try root.insert(key2, &value2, testing.allocator);
+    try root.insert(key2, &value2, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
 
     var val = try root.get(key1);
