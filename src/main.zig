@@ -257,8 +257,8 @@ const Node = union(enum) {
     }
     fn toDot(self: *const Node, allocator: Allocator, path: []const u8, parent: []const u8) ![]const u8 {
         const hash = self.commitment().mapToScalarField();
-        const me = std.fmt.allocPrint(allocator, "internal{s}", .{path});
         var sofar: []u8 = std.fmt.allocPrint(allocator, "{}\n{} [label=\"I: {}\"]", .{ me, hash });
+        const me = std.fmt.allocPrint(allocator, "{}{s}", .{ @typeName(self), path });
         switch (self.*) {
             .branch => |br| for (br.children, 0..) |child, childidx| {
                 const child_path = std.fmt.allocPrint(allocator, "{}{}", .{ me, childidx });
