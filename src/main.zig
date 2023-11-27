@@ -325,14 +325,17 @@ test "insert into empty tree" {
     defer root.tear_down(testing.allocator);
 
     switch (root.*) {
-        Node.last_level => |ll| {
-            for (ll.values, 0..) |v, i| {
-                if (i == 0) {
-                    try testing.expect(v != null);
-                } else {
-                    try testing.expect(v == null);
+        Node.branch => |br| switch (br.children[0]) {
+            Node.last_level => |ll| {
+                for (ll.values, 0..) |v, i| {
+                    if (i == 0) {
+                        try testing.expect(v != null);
+                    } else {
+                        try testing.expect(v == null);
+                    }
                 }
-            }
+            },
+            else => return error.InvalidNodeType,
         },
         else => return error.InvalidNodeType,
     }
@@ -349,14 +352,17 @@ test "insert into a last_level node, difference in suffix" {
     defer root.tear_down(testing.allocator);
 
     switch (root.*) {
-        Node.last_level => |ll| {
-            for (ll.values, 0..) |v, i| {
-                if (i < 2) {
-                    try testing.expect(v != null);
-                } else {
-                    try testing.expect(v == null);
+        Node.branch => |br| switch (br.children[0]) {
+            Node.last_level => |ll| {
+                for (ll.values, 0..) |v, i| {
+                    if (i < 2) {
+                        try testing.expect(v != null);
+                    } else {
+                        try testing.expect(v == null);
+                    }
                 }
-            }
+            },
+            else => return error.InvalidNodeType,
         },
         else => return error.InvalidNodeType,
     }
