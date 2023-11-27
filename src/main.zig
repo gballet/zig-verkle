@@ -279,6 +279,9 @@ const Node = union(enum) {
             .hash => {
                 sofar = std.fmt.allocPrint(allocator, "{}\n{} [label=\"H: {}\"]", .{ sofar, me, hash });
             },
+            .unresolved => {
+                sofar = std.fmt.allocPrint(allocator, "{}\n{} [label=\"?\"]", .{ sofar, me });
+            },
             _ => {}, // ignore other node types for now
         }
         if (parent.len > 0) {
