@@ -257,39 +257,39 @@ const Node = union(enum) {
     }
 
     fn toDot(self: *const Node, allocator: Allocator, path: []const u8, parent: []const u8) ![]const u8 {
-        const hash = self.commitment().mapToScalarField();
-        const me = std.fmt.allocPrint(allocator, "{}{s}", .{ @typeName(self), path });
-        const me = try std.fmt.allocPrint(allocator, "{}{s}", .{ @typeName(@TypeOf(self)), path });
+        const comm = try self.commitment();
+        const hash = comm.mapToScalarField().toBytes();
+        const me = try std.fmt.allocPrint(allocator, "{s}{s}", .{ @typeName(@TypeOf(self)), path });
         var sofar: []u8 = "";
         switch (self.*) {
             .branch => |br| {
-                sofar = try std.fmt.allocPrint(allocator, "{}\n{} [label=\"I: {}\"]\n", .{ sofar, me, hash });
+                sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"I: {s}\"]\n", .{ sofar, me, hash });
                 for (br.children, 0..) |child, childidx| {
-                    const child_path = try std.fmt.allocPrint(allocator, "{}{}", .{ me, childidx });
-                    sofar = try std.fmt.allocPrint(allocator, "{}\n{}", .{ sofar, child.toDot(allocator, child_path, me) });
+                    const child_path = try std.fmt.allocPrint(allocator, "{s}{}", .{ me, childidx });
+                    sofar = try std.fmt.allocPrint(allocator, "{s}\n{s}", .{ sofar, try child.toDot(allocator, child_path, me) });
                 }
             },
             .last_level => |ll| {
-                sofar = try std.fmt.allocPrint(allocator, "{}\n{} [label=\"I: {}\nS: {}\"]\n", .{ sofar, me, hash, ll.key });
+                sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"I: {s}\nS: {s}\"]\n", .{ sofar, me, hash, ll.key });
                 for (ll.values, 0..) |val, validx| {
                     if (val) |value| {
-                        sofar = try std.fmt.allocPrint(allocator, "{}\n{} [label=\"{}\"]\n{} -> value{}{}", .{ sofar, me, value.*, me, path, validx });
+                        sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"{s}\"]\n{s} -> value{s}{}", .{ sofar, me, value.*, me, path, validx });
                     }
                 }
             },
             .hash => {
-                sofar = try std.fmt.allocPrint(allocator, "{}\n{} [label=\"H: {}\"]", .{ sofar, me, hash });
+                sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"H: {s}\"]", .{ sofar, me, hash });
             },
             .unresolved => {
-                sofar = try std.fmt.allocPrint(allocator, "{}\n{} [label=\"?\"]", .{ sofar, me });
+                sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"?\"]", .{ sofar, me });
             },
             else => {}, // ignore other node types for now
         }
         if (parent.len > 0) {
-            sofar = try std.fmt.allocPrint(allocator, "{} {}\n{} -> {}", .{ sofar, me, parent, me });
+            sofar = try std.fmt.allocPrint(allocator, "{s} {s}\n{s} -> {s}", .{ sofar, me, parent, me });
         }
 
-        return std.fmt.allocPrint(allocator, "digraph {\n {}\n}", .{sofar});
+        return std.fmt.allocPrint(allocator, "digraph D \n {s}\n", .{sofar});
     }
 };
 
