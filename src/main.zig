@@ -520,6 +520,8 @@ test "compare simple tree root with that of rust implementation" {
     defer crs.deinit();
     var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
+    defer root.tear_down(testing.allocator);
+
     const test_account_keys = [_]Key{
         Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 0 },
         Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 1 },
