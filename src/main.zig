@@ -138,7 +138,7 @@ const BranchNode = struct {
     }
 };
 
-fn newll(key: Key, value: *Slot, allocator: Allocator, crs: *CRS) !*LastLevelNode {
+fn newll(key: Key, value: *const Slot, allocator: Allocator, crs: *CRS) !*LastLevelNode {
     const slot = key[31];
     var ll = try allocator.create(LastLevelNode);
     ll.values = [_]?*Slot{null} ** 256;
@@ -171,7 +171,7 @@ const Node = union(enum) {
         return @This(){ .branch = br };
     }
 
-    fn insert(self: *Node, key: Key, value: *Slot, allocator: Allocator, crs: *CRS) !void {
+    fn insert(self: *Node, key: Key, value: *const Slot, allocator: Allocator, crs: *CRS) !void {
         return self.insert_with_depth(key, value, allocator, 0, crs);
     }
 
@@ -191,7 +191,7 @@ const Node = union(enum) {
         };
     }
 
-    fn insert_with_depth(self: *Node, key: Key, value: *Slot, allocator: Allocator, depth: u8, crs: *CRS) anyerror!void {
+    fn insert_with_depth(self: *Node, key: Key, value: *const Slot, allocator: Allocator, depth: u8, crs: *CRS) anyerror!void {
         return switch (self.*) {
             .empty => {
                 self.* = @unionInit(Node, "last_level", try newll(key, value, allocator, crs));
