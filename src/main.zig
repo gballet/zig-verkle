@@ -515,6 +515,22 @@ test "check verkle-crypto can be imported" {
     try expect(!Element.equal(point, Element.generator()));
 }
 
+test "compatibility with go-verkle" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    defer root.tear_down(testing.allocator);
+
+    // step 1: try an empty tree
+    const r = try root.commitment();
+    const r_bytes = r.toBytes();
+
+    const empty_root = [_]u8{0} ** 32;
+
+    try std.testing.expectEqual(empty_root, r_bytes);
+}
+
 test "compare simple tree root with that of rust implementation" {
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
