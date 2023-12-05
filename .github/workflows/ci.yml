@@ -59,3 +59,29 @@ jobs:
     
       - name: Test
         run: git submodule update --init --recursive && zig build -Dtarget="aarch64-linux"
+
+  build-riscv64:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+    
+      - name: Set up Zig
+        uses: korandoru/setup-zig@v1
+        with:
+          zig-version: 0.11.0
+    
+      - name: Check for presence of qemu-riscv64
+        run: |
+          if [[ `which qemu-riscv64` != '' ]]; then
+            echo "HAS_QEMU_RISCV64=true" >> "$GITHUB_ENV"
+          else 
+            echo "HAS_QEMU_RISCV64=false" >> "$GITHUB_ENV"
+          fi
+      
+      - name: Get submodules
+        if: env.HAS_QEMU_RISCV64 == 'true'
+        run: git submodule update --init --recursive
+        
+      - name: Build and run target
+        if: env.HAS_QEMU_RISCV64 == 'true'
+        run:  zig build test -Dtarget="riscv64-linux"
