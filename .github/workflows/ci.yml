@@ -57,8 +57,23 @@ jobs:
         with:
           zig-version: 0.11.0
     
+      - name: Check for presence of qemu-aarch64
+        run: |
+          if [[ `which qemu-aarch64` != '' ]]; then
+            echo "HAS_QEMU_AARCH64=true" >> "$GITHUB_ENV"
+          else 
+            echo "HAS_QEMU_AARCH64=false" >> "$GITHUB_ENV"
+          fi
+      
+      - name: Get submodules
+        run: git submodule update --init --recursive
+        
+      - name: Build
+        run: zig build -Dtarget="aarch64-linux"
+        
       - name: Test
-        run: git submodule update --init --recursive && zig build -Dtarget="aarch64-linux"
+        if: env.HAS_QEMU_AARCH64 == 'true'
+        run: zig build test -Dtarget="aarch64-linux"
 
   build-riscv64:
     runs-on: self-hosted
@@ -79,9 +94,11 @@ jobs:
           fi
       
       - name: Get submodules
-        if: env.HAS_QEMU_RISCV64 == 'true'
         run: git submodule update --init --recursive
         
-      - name: Build and run target
+      - name: Build
+        run:  zig build -Dtarget="riscv64-linux"
+
+      - name: Test
         if: env.HAS_QEMU_RISCV64 == 'true'
         run:  zig build test -Dtarget="riscv64-linux"
