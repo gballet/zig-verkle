@@ -116,6 +116,8 @@ const BranchNode = struct {
             if (child != .empty) {
                 const point = try child.commitment();
                 vals[i] = point.mapToScalarField();
+            } else {
+                vals[i] = Fr.zero();
             }
         }
         return self.crs.commit(vals[0..]);
