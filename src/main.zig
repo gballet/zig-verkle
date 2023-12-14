@@ -48,7 +48,7 @@ const LastLevelNode = struct {
                 // msb
                 copy(u8, data[16..], value.?[0..16]);
                 data[15] = 0; // clear leaf marker
-                vals[2 * i] = Fr.fromBytes(data);
+                vals[2 * i + 1] = Fr.fromBytes(data);
             }
         }
 
