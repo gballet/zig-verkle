@@ -546,6 +546,17 @@ test "compatibility with go-verkle" {
     const empty_root = [_]u8{0} ** 32;
 
     try std.testing.expectEqual(empty_root, r_bytes);
+    const zero_key = [_]u8{0} ** 32;
+
+    try root.insert(zero_key, &zero_key, testing.allocator, &crs);
+
+    const r_single = try root.commitment();
+    const r_single_bytes = r_single.toBytes();
+
+    var single_leaf_root: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(single_leaf_root[0..], "6b630905ce275e39f223e175242df2c1e8395e6f46ec71dce5557012c1334a5c");
+
+    try std.testing.expectEqual(single_leaf_root, r_single_bytes);
 }
 
 test "compare simple tree root with that of rust implementation" {
