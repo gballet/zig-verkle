@@ -68,12 +68,12 @@ const LastLevelNode = struct {
     }
 
     fn computeCommitment(self: *const LastLevelNode) !Element {
-        var vals: [256]Fr = undefined;
+        var vals: [4]Fr = undefined;
 
-        vals[0] = Fr.fromInteger(2);
+        vals[0] = Fr.fromInteger(1);
 
         var stem = [_]u8{0} ** Fr.BytesSize;
-        std.mem.copy(u8, stem[1..], self.key[0..]);
+        std.mem.copy(u8, stem[0..], self.key[0..31]);
         vals[1] = Fr.fromBytes(stem);
 
         const c1 = try computeSuffixNodeCommitment(self.crs, self.values[0..128]);
