@@ -41,13 +41,13 @@ const LastLevelNode = struct {
                 var data: [Fr.BytesSize]u8 = [_]u8{0} ** Fr.BytesSize;
 
                 // lsb
-                copy(u8, data[16..], value.?[16..]);
-                data[15] = 1; // leaf marker
+                copy(u8, data[0..16], value.?[0..16]);
+                data[16] = 1; // leaf marker
                 vals[2 * i] = Fr.fromBytes(data);
 
                 // msb
-                copy(u8, data[16..], value.?[0..16]);
-                data[15] = 0; // clear leaf marker
+                copy(u8, data[0..16], value.?[16..]);
+                data[16] = 0; // clear leaf marker
                 vals[2 * i + 1] = Fr.fromBytes(data);
             } else {
                 vals[2 * i] = Fr.zero();
