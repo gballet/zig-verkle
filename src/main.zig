@@ -277,7 +277,7 @@ const Node = union(enum) {
     fn toDot(self: *const Node, str: *std.ArrayList(u8), allocator: Allocator, path: []const u8, parent: []const u8) !void {
         const comm = try self.commitment();
         const hash = comm.mapToScalarField().toBytes();
-        const me = try std.fmt.allocPrint(allocator, "{s}{s}", .{ @typeName(@TypeOf(self)), path });
+        const me = try std.fmt.allocPrint(allocator, "{s}{s}", .{ @tagName(self.*), path });
         defer allocator.free(me);
         switch (self.*) {
             .branch => |br| {
