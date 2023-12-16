@@ -289,7 +289,7 @@ const Node = union(enum) {
 
                 for (br.children, 0..) |child, childidx| {
                     if (child != .empty) {
-                        const child_path = try std.fmt.allocPrint(allocator, "{s}{x:0>2}", .{ me, childidx });
+                        const child_path = try std.fmt.allocPrint(allocator, "{s}{x:0>2}", .{ path, childidx });
                         defer allocator.free(child_path); // TODO reuse a buffer instead of allocating
 
                         try child.toDot(str, allocator, child_path, me);
