@@ -274,44 +274,69 @@ const Node = union(enum) {
         };
     }
 
-    fn toDot(self: *const Node, allocator: Allocator, path: []const u8, parent: []const u8) ![]const u8 {
+    fn toDot(self: *const Node, str: *std.ArrayList(u8), allocator: Allocator, path: []const u8, parent: []const u8) !void {
         const comm = try self.commitment();
         const hash = comm.mapToScalarField().toBytes();
         const me = try std.fmt.allocPrint(allocator, "{s}{s}", .{ @typeName(@TypeOf(self)), path });
-        var sofar: []u8 = "";
+        defer allocator.free(me);
         switch (self.*) {
             .branch => |br| {
-                sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"I: {s}\"]\n", .{ sofar, me, hash });
+                if (br.depth == 0) {
+                    _ = try str.writer().write("digraph D {\n");
+                }
+
+                try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\"]\n", .{ me, hash });
+
                 for (br.children, 0..) |child, childidx| {
                     const child_path = try std.fmt.allocPrint(allocator, "{s}{}", .{ me, childidx });
-                    sofar = try std.fmt.allocPrint(allocator, "{s}\n{s}", .{ sofar, try child.toDot(allocator, child_path, me) });
+                    defer allocator.free(child_path); // TODO reuse a buffer instead of allocating
+
+                    try child.toDot(str, allocator, child_path, me);
+                }
+
+                if (br.depth == 0) {
+                    _ = try str.writer().write("}");
                 }
             },
             .last_level => |ll| {
-                sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"I: {s}\nS: {s}\"]\n", .{ sofar, me, hash, ll.key });
+                try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\\nS: {s}\"]\n", .{ me, hash, ll.key });
+
                 for (ll.values, 0..) |val, validx| {
                     if (val) |value| {
-                        sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"{s}\"]\n{s} -> value{s}{}", .{ sofar, me, value.*, me, path, validx });
+                        try std.fmt.format(str.writer(), "value{s}{} [label=\"{s}\"]\n{s} -> value{s}{}\n", .{ path, validx, value.*, me, path, validx });
                     }
                 }
             },
             .hash => {
-                sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"H: {s}\"]", .{ sofar, me, hash });
+                try std.fmt.format(str.writer(), "{s} [label=\"H: {s}\"]\n", .{ me, hash });
             },
             .unresolved => {
-                sofar = try std.fmt.allocPrint(allocator, "{s}\n{s} [label=\"?\"]", .{ sofar, me });
+                try std.fmt.format(str.writer(), "{s} [label=\"?\"]\n", .{me});
             },
             else => {}, // ignore other node types for now
         }
+
         if (parent.len > 0) {
-            sofar = try std.fmt.allocPrint(allocator, "{s} {s}\n{s} -> {s}", .{ sofar, me, parent, me });
+            try std.fmt.format(str.writer(), "{s} -> {s}\n", .{ parent, me });
         }
 
-        return std.fmt.allocPrint(allocator, "digraph D \n {s}\n", .{sofar});
     }
 };
 
-// test "testing toDot" {
+test "testing toDot" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root: *Node = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
+    var list = std.ArrayList(u8).init(testing.allocator);
+    defer list.deinit();
+
+    try root.toDot(&list, testing.allocator, "", "");
+    std.debug.print("{s}\n", .{list.items[0..]});
+}
 //     var crs = try CRS.init(testing.allocator);
 //     defer crs.deinit();
 //     var root_ = try Node.new(testing.allocator, &crs);
