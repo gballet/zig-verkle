@@ -285,7 +285,7 @@ const Node = union(enum) {
                     _ = try str.writer().write("digraph D {\n");
                 }
 
-                try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\"]\n", .{ me, hash });
+                try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\"]\n", .{ me, std.fmt.fmtSliceHexLower(&hash) });
 
                 for (br.children, 0..) |child, childidx| {
                     if (child != .empty) {
@@ -301,11 +301,11 @@ const Node = union(enum) {
                 }
             },
             .last_level => |ll| {
-                try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\\nS: {s}\"]\n", .{ me, hash, ll.key });
+                try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\\nS: {}\"]\n", .{ me, std.fmt.fmtSliceHexLower(&hash), std.fmt.fmtSliceHexLower(&ll.key) });
 
                 for (ll.values, 0..) |val, validx| {
                     if (val) |value| {
-                        try std.fmt.format(str.writer(), "value{s}{x:0>2} [label=\"{s}\"]\n{s} -> value{s}{x:0>2}\n", .{ path, validx, value.*, me, path, validx });
+                        try std.fmt.format(str.writer(), "value{s}{x:0>2} [label=\"{s}\"]\n{s} -> value{s}{x:0>2}\n", .{ path, validx, std.fmt.fmtSliceHexLower(value), me, path, validx });
                     }
                 }
             },
