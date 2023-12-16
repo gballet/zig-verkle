@@ -288,10 +288,12 @@ const Node = union(enum) {
                 try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\"]\n", .{ me, hash });
 
                 for (br.children, 0..) |child, childidx| {
-                    const child_path = try std.fmt.allocPrint(allocator, "{s}{}", .{ me, childidx });
-                    defer allocator.free(child_path); // TODO reuse a buffer instead of allocating
+                    if (child != .empty) {
+                        const child_path = try std.fmt.allocPrint(allocator, "{s}{}", .{ me, childidx });
+                        defer allocator.free(child_path); // TODO reuse a buffer instead of allocating
 
-                    try child.toDot(str, allocator, child_path, me);
+                        try child.toDot(str, allocator, child_path, me);
+                    }
                 }
 
                 if (br.depth == 0) {
