@@ -323,7 +323,6 @@ const Node = union(enum) {
         if (parent.len > 0) {
             try std.fmt.format(str.writer(), "{s} -> {s}\n", .{ parent, me });
         }
-
     }
 };
 
