@@ -341,16 +341,6 @@ test "testing toDot" {
     try root.toDot(&list, "", "");
     std.debug.print("{s}\n", .{list.items[0..]});
 }
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root: *Node = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
-
-//     std.debug.print("{s}\n", .{try root.toDot(testing.allocator, "", "")});
-// }
 
 test "inserting into hash raises an error" {
     var crs = try CRS.init(testing.allocator);
