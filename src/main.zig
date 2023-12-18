@@ -274,11 +274,13 @@ const Node = union(enum) {
         };
     }
 
-    fn toDot(self: *const Node, str: *std.ArrayList(u8), allocator: Allocator, path: []const u8, parent: []const u8) !void {
+    // TODO remove allocator
+    fn toDot(self: *const Node, str: *std.ArrayList(u8), path: []const u8, parent: []const u8) !void {
         const comm = try self.commitment();
         const hash = comm.mapToScalarField().toBytes();
-        const me = try std.fmt.allocPrint(allocator, "{s}{s}", .{ @tagName(self.*), path });
-        defer allocator.free(me);
+        var mebuf = [_]u8{0} ** 100;
+        const me = try std.fmt.bufPrint(mebuf[0..], "{s}{s}", .{ @tagName(self.*), path });
+
         switch (self.*) {
             .branch => |br| {
                 if (br.depth == 0) {
@@ -289,10 +291,10 @@ const Node = union(enum) {
 
                 for (br.children, 0..) |child, childidx| {
                     if (child != .empty) {
-                        const child_path = try std.fmt.allocPrint(allocator, "{s}{x:0>2}", .{ path, childidx });
-                        defer allocator.free(child_path); // TODO reuse a buffer instead of allocating
+                        var buf = [_]u8{0} ** 64;
+                        const child_path = try std.fmt.bufPrint(buf[0..], "{s}{x:0>2}", .{ path, childidx });
 
-                        try child.toDot(str, allocator, child_path, me);
+                        try child.toDot(str, child_path, me);
                     }
                 }
 
@@ -336,7 +338,7 @@ test "testing toDot" {
     var list = std.ArrayList(u8).init(testing.allocator);
     defer list.deinit();
 
-    try root.toDot(&list, testing.allocator, "", "");
+    try root.toDot(&list, "", "");
     std.debug.print("{s}\n", .{list.items[0..]});
 }
 //     var crs = try CRS.init(testing.allocator);
