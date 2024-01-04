@@ -1,9 +1,6 @@
 const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
-// Use Edwards25519 at the moment, since bandersnatch is currently
-// unavailable, and Edwards is the only curve available in zig, that
-// both supports addition and serializes to 32 bytes.
 const curve = std.crypto.ecc.Edwards25519;
 const verkle_crypto = @import("verkle-crypto");
 const banderwagon = verkle_crypto.banderwagon;
