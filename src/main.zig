@@ -1,6 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const curve = std.crypto.ecc.Edwards25519;
 const verkle_crypto = @import("verkle-crypto");
 const banderwagon = verkle_crypto.banderwagon;
@@ -16,9 +17,16 @@ const Stem = [31]u8;
 const Hash = [32]u8;
 
 const ProofItems = struct {
+    cis: ArrayList(*Element),
+    yis: ArrayList(?*Fr),
+    zis: ArrayList(u8),
+    // don't support stateful proofs just yet
+    // fis: *ArrayList(ArrayList(*Fr)),
+
     fn merge(self: *ProofItems, other: *const ProofItems) !void {
-        _ = other;
-        _ = self;
+        try self.zis.appendSlice(other.zis);
+        try self.yis.appendSlice(other.yis);
+        try self.cis.appendSlice(other.cis);
     }
 };
 
@@ -82,21 +90,28 @@ const LastLevelNode = struct {
         return self.crs.commit(vals[0..]);
     }
 
-    fn get_proof_items(self: *const LastLevelNode, keys: []Key) !ProofItems {
+    fn getProofItems(self: *const LastLevelNode, keys: []Key) !ProofItems {
         var has_c1 = false;
         var has_c2 = false;
         var proof_items = ProofItems{};
+
+        proof_items.zis.append(0);
+        proof_items.zis.append(1);
         for (keys) |key| {
             if (key[31] < 128 and !has_c1) {
                 has_c1 = true;
                 // add c1 to proof item
 
+                proof_items.cis.append(self.c1);
+                proof_items.zis.append(2);
             }
             if (key[31] >= 128 and !has_c2) {
                 has_c2 = true;
                 // add c2 to proof item
+                proof_items.cis.append(self.c2);
+                proof_items.zis.append(3);
             }
-            _ = self.values[key[31]];
+            proof_items.zis.append(self.values[key[31]]);
         }
 
         return proof_items;
@@ -319,6 +334,14 @@ const Node = union(enum) {
 
         if (parent.len > 0) {
             try std.fmt.format(str.writer(), "{s} -> {s}\n", .{ parent, me });
+        }
+    }
+
+    fn getProofItems(self: *const Node, keys: []Key) !ProofItems {
+        switch (self.*) {
+            // .branch => |br| br.getProofItems(keys),
+            .last_level => |ll| ll.getProofItems(keys),
+            else => error.NotImplemented,
         }
     }
 };
