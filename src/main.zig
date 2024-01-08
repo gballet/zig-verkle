@@ -16,6 +16,12 @@ const Key = [32]u8;
 const Stem = [31]u8;
 const Hash = [32]u8;
 
+const ExtStatus = enum {
+    Empty,
+    Other,
+    Present,
+};
+
 const ProofItems = struct {
     cis: ArrayList(*Element),
     yis: ArrayList(?*Fr),
@@ -23,12 +29,40 @@ const ProofItems = struct {
     // don't support stateful proofs just yet
     // fis: *ArrayList(ArrayList(*Fr)),
 
+    esses: ArrayList(u8),
+    poas: ArrayList(*Stem),
+    values: ArrayList(?*Fr),
+
     fn merge(self: *ProofItems, other: *const ProofItems) !void {
         try self.zis.appendSlice(other.zis);
         try self.yis.appendSlice(other.yis);
         try self.cis.appendSlice(other.cis);
     }
 };
+
+fn leafToFrs(fill: []*Fr, val: ?*Slot) !void {
+    if (val) |v| {
+        _ = v;
+        var lo = [_]u8{0} ** 16 ++ [_]u8{1} ++ [_]u8{0} ** 15;
+        var hi = [_]u8{0} ** 32;
+        std.mem.copy(u8, lo[0..16], val[0..16]);
+        std.mem.copy(u8, hi[0..16], val[16..]);
+        fill[0].* = Fr.fromBytes(lo);
+        fill[1].* = Fr.fromBytes(hi);
+    }
+}
+
+fn fillSuffixTreePoly(ret: *[256]Fr, values: [128]?*Slot) !usize {
+    var count: usize = 0;
+    for (values, 0..) |val, idx| {
+        if (val) {
+            count += 1;
+            try leafToFrs(ret[(idx << 1) & 0xff ..], val);
+        }
+    }
+
+    return count;
+}
 
 const LastLevelNode = struct {
     values: [256]?*Slot,
@@ -95,25 +129,97 @@ const LastLevelNode = struct {
         var has_c2 = false;
         var proof_items = ProofItems{};
 
-        proof_items.zis.append(0);
-        proof_items.zis.append(1);
-        for (keys) |key| {
-            if (key[31] < 128 and !has_c1) {
-                has_c1 = true;
-                // add c1 to proof item
 
-                proof_items.cis.append(self.c1);
-                proof_items.zis.append(2);
+        for (keys) |key| {
+            if (std.mem.eql(u8, key[0..31], self.key)) {
+                has_c1 = key[31] < 128;
+                has_c2 = key[31] >= 128;
+                if (has_c2) {
+                    break;
+                }
             }
-            if (key[31] >= 128 and !has_c2) {
-                has_c2 = true;
-                // add c2 to proof item
-                proof_items.cis.append(self.c2);
-                proof_items.zis.append(3);
-            }
-            proof_items.zis.append(self.values[key[31]]);
         }
 
+        if (self.is_poa_stub) {
+            if (has_c1 or has_c2 or self.c1 != null or self.c2 != null) {
+                return error.InvalidProofOfAbsenceStub;
+            }
+        }
+        // else: batch map to scalar field when supported
+
+        // serialize commitments if they are required
+        if (has_c1) {
+            proof_items.cis.append(self.c1);
+            proof_items.zis.append(2);
+            proof_items.yis.append(Element.mapToScalarField(self.c1));
+        }
+        if (has_c2) {
+            proof_items.cis.append(self.c2);
+            proof_items.zis.append(3);
+            proof_items.yis.append(Element.mapToScalarField(self.c2));
+        }
+
+        // second pass: add the Cn-level elements
+        for (keys) |key| {
+            // another present stem proves the absence of this stem
+            if (!std.mem.eql(u8, key[0..31], self.stem)) {
+                if (proof_items.esses.items.len == 0) {
+                    proof_items.poas.append(&self.stem);
+                    proof_items.esses.append(ExtStatus.Other | self.depth << 3);
+                }
+                proof_items.values.append(null);
+                continue;
+            }
+
+            // corner case: if a proof-of-absence stem was found, and the same stem is used as a proof-of-presence, clear the list.
+            if (proof_items.poass.len > 0) {
+                proof_items.poass = null; // find a way to clear this list
+                proof_items.esses = null; // find a way to clear this list
+            }
+            const suffix = key[31];
+            var suffix_poly: [128]?*Slot = undefined;
+            const count = try fillSuffixTreePoly(&suffix_poly, if (suffix >= 128) {
+                self.values[0..128];
+            } else {
+                self.values[128..256];
+            });
+
+            // proof of absence: case of a missing suffix tree.
+            if (count == 0) {
+                proof_items.esses.append(ExtStatus.Empty | self.depth << 3);
+                proof_items.values.append(null);
+                continue;
+            }
+
+            // leaf is present
+            proof_items.cis.append(if (suffix < 128) {
+                self.c1;
+            } else {
+                self.c2;
+            });
+            proof_items.cis.append(if (suffix < 128) {
+                self.c1;
+            } else {
+                self.c2;
+            });
+            proof_items.zis.append(2 * suffix);
+            proof_items.zis.append(2 * suffix + 1);
+            proof_items.yis.append(if (self.values[suffix]) {
+                suffix_poly[2 * suffix];
+            } else {
+                Fr.zero;
+            });
+            proof_items.yis.append(if (self.values[suffix]) {
+                suffix_poly[2 * suffix + 1];
+            } else {
+                Fr.zero;
+            });
+            proof_items.values.append(self.values[suffix]);
+
+            if (proof_items.esses.len == 0 or proof_items.esses.items[proof_items.esses.len - 1] != ExtStatus.Present | self.depth << 3) {
+                proof_items.esses.append(ExtStatus.Present | self.depth << 3);
+            }
+        }
         return proof_items;
     }
 };
@@ -138,7 +244,7 @@ const BranchNode = struct {
         return self.crs.commit(vals[0..]);
     }
 
-    fn get_proof_items(self: *const BranchNode, keys: []Key) !ProofItems {
+    fn getProofItems(self: *const BranchNode, keys: []Key) !ProofItems {
         var groupstart = 0;
         // TODO initialize with my proof info
         var proof_items = ProofItems{};
@@ -148,7 +254,7 @@ const BranchNode = struct {
                 groupend += 1;
             }
 
-            const child_proof_items = self.children[keys[groupstart][self.depth]].get_proof_items(keys[groupstart..groupend]);
+            const child_proof_items = self.children[keys[groupstart][self.depth]].getProofItems(keys[groupstart..groupend]);
 
             proof_items.merge(child_proof_items);
         }
