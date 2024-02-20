@@ -124,11 +124,10 @@ const LastLevelNode = struct {
         return self.crs.commit(vals[0..]);
     }
 
-    fn getProofItems(self: *const LastLevelNode, keys: []Key) !ProofItems {
+    fn getProofItems(self: *const LastLevelNode, keys: []const Key) !ProofItems {
         var has_c1 = false;
         var has_c2 = false;
         var proof_items = ProofItems{};
-
 
         for (keys) |key| {
             if (std.mem.eql(u8, key[0..31], self.key)) {
@@ -244,8 +243,8 @@ const BranchNode = struct {
         return self.crs.commit(vals[0..]);
     }
 
-    fn getProofItems(self: *const BranchNode, keys: []Key) !ProofItems {
-        var groupstart = 0;
+    fn getProofItems(self: *const BranchNode, keys: []const Key) !ProofItems {
+        var groupstart: usize = 0;
         // TODO initialize with my proof info
         var proof_items = ProofItems{};
         while (groupstart < keys.len) {
@@ -383,15 +382,6 @@ const Node = union(enum) {
         };
     }
 
-    // assume that keys are sorted
-    fn get_proof_items(self: *const Node, keys: [][32]u8) !ProofItems {
-        return switch (self.*) {
-            .branch => |br| br.get_proof_items(keys),
-            .last_level => |ll| ll.get_proof_items(keys),
-            _ => error.NotImplemented,
-        };
-    }
-
     // TODO remove allocator
     fn toDot(self: *const Node, str: *std.ArrayList(u8), path: []const u8, parent: []const u8) !void {
         const comm = try self.commitment();
@@ -443,12 +433,12 @@ const Node = union(enum) {
         }
     }
 
-    fn getProofItems(self: *const Node, keys: []Key) !ProofItems {
-        switch (self.*) {
-            // .branch => |br| br.getProofItems(keys),
+    fn getProofItems(self: *const Node, keys: []const Key) !ProofItems {
+        return switch (self.*) {
+            .branch => |br| br.getProofItems(keys),
             .last_level => |ll| ll.getProofItems(keys),
             else => error.NotImplemented,
-        }
+        };
     }
 };
 
@@ -736,4 +726,29 @@ test "compare simple tree root with that of rust implementation" {
     const r_bytes = r.toBytes();
 
     try std.testing.expectEqual(rust_root_comm, r_bytes);
+}
+
+test "get proof items for a tree with 3 values, 1 in each branch" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    defer root.tear_down(testing.allocator);
+
+    const keys = [_]Key{
+        Key{ 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1 },
+        Key{ 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2, 0, 2 },
+        Key{ 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0, 3, 0 },
+    };
+    const values = [_]*const Slot{
+        &Slot{ 197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125, 178, 220, 199, 3, 192, 229, 0, 182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112 },
+        &Slot{ 197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125, 178, 220, 199, 3, 192, 229, 0, 182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112 },
+        &Slot{ 197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125, 178, 220, 199, 3, 192, 229, 0, 182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112 },
+    };
+
+    for (keys, 0..) |key, i| {
+        try root.insert(key, values[i], testing.allocator, &crs);
+    }
+
+    try root.getProofItems(keys[0..1]);
 }
