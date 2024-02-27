@@ -24,38 +24,66 @@ const ExtStatus = enum {
 
 const ProofItems = struct {
     cis: ArrayList(*Element),
-    yis: ArrayList(?*Fr),
+    yis: ArrayList(?Fr),
     zis: ArrayList(u8),
     // don't support stateful proofs just yet
     // fis: *ArrayList(ArrayList(*Fr)),
 
     esses: ArrayList(u8),
-    poas: ArrayList(*Stem),
-    values: ArrayList(?*Fr),
+    poas: ArrayList(Stem),
+    values: ArrayList(?*Slot),
+
+    const Self = @This();
 
     fn merge(self: *ProofItems, other: *const ProofItems) !void {
-        try self.zis.appendSlice(other.zis);
-        try self.yis.appendSlice(other.yis);
-        try self.cis.appendSlice(other.cis);
+        try self.zis.appendSlice(other.zis.items);
+        try self.yis.appendSlice(other.yis.items);
+        try self.cis.appendSlice(other.cis.items);
+        try self.esses.appendSlice(other.esses.items);
+        try self.poas.appendSlice(other.poas.items);
+        try self.values.appendSlice(other.values.items);
+    }
+
+    pub fn init(alloc: Allocator) Self {
+        return Self{
+            .cis = ArrayList(*Element).init(alloc),
+            .yis = ArrayList(?Fr).init(alloc),
+            .zis = ArrayList(u8).init(alloc),
+            .esses = ArrayList(u8).init(alloc),
+            .poas = ArrayList(Stem).init(alloc),
+            .values = ArrayList(?*Slot).init(alloc),
+        };
+    }
+
+    fn deinit(self: *ProofItems) void {
+        self.cis.deinit();
+        self.yis.deinit();
+        self.zis.deinit();
+        self.esses.deinit();
+        self.poas.deinit();
+        self.values.deinit();
     }
 };
 
-fn leafToFrs(fill: []*Fr, val: ?*Slot) !void {
+fn leafToFrs(fill: []Fr, val: ?*Slot) !void {
     if (val) |v| {
         _ = v;
         var lo = [_]u8{0} ** 16 ++ [_]u8{1} ++ [_]u8{0} ** 15;
         var hi = [_]u8{0} ** 32;
-        std.mem.copy(u8, lo[0..16], val[0..16]);
-        std.mem.copy(u8, hi[0..16], val[16..]);
-        fill[0].* = Fr.fromBytes(lo);
-        fill[1].* = Fr.fromBytes(hi);
+        std.mem.copy(u8, lo[0..16], val.?[0..16]);
+        std.mem.copy(u8, hi[0..16], val.?[16..]);
+        fill[0] = Fr.fromBytes(lo);
+        fill[1] = Fr.fromBytes(hi);
     }
 }
 
-fn fillSuffixTreePoly(ret: *[256]Fr, values: [128]?*Slot) !usize {
+fn fillSuffixTreePoly(ret: *[256]Fr, values: []const ?*Slot) !usize {
+    if (values.len != 128) {
+        return error.InvalidValueSubGroupSize;
+    }
     var count: usize = 0;
     for (values, 0..) |val, idx| {
-        if (val) {
+        if (val != null) {
             count += 1;
             try leafToFrs(ret[(idx << 1) & 0xff ..], val);
         }
@@ -66,8 +94,12 @@ fn fillSuffixTreePoly(ret: *[256]Fr, values: [128]?*Slot) !usize {
 
 const LastLevelNode = struct {
     values: [256]?*Slot,
-    key: Stem,
+    stem: Stem,
     crs: *CRS,
+    is_poa_stub: bool,
+    c1: ?*Element,
+    c2: ?*Element,
+    depth: u8,
 
     fn computeSuffixNodeCommitment(crs: *CRS, values: []const ?*Slot) !Element {
         if (values.len != 128) {
@@ -112,7 +144,7 @@ const LastLevelNode = struct {
         vals[0] = Fr.fromInteger(1);
 
         var stem = [_]u8{0} ** Fr.BytesSize;
-        std.mem.copy(u8, stem[0..], self.key[0..31]);
+        std.mem.copy(u8, stem[0..], self.stem[0..31]);
         vals[1] = Fr.fromBytes(stem);
 
         const c1 = try computeSuffixNodeCommitment(self.crs, self.values[0..128]);
@@ -124,13 +156,14 @@ const LastLevelNode = struct {
         return self.crs.commit(vals[0..]);
     }
 
-    fn getProofItems(self: *const LastLevelNode, keys: []const Key) !ProofItems {
+    fn getProofItems(self: *const LastLevelNode, keys: []const Key, alloc: Allocator) !ProofItems {
         var has_c1 = false;
         var has_c2 = false;
-        var proof_items = ProofItems{};
+        var proof_items = ProofItems.init(alloc);
+        errdefer proof_items.deinit();
 
         for (keys) |key| {
-            if (std.mem.eql(u8, key[0..31], self.key)) {
+            if (std.mem.eql(u8, key[0..31], &self.stem)) {
                 has_c1 = key[31] < 128;
                 has_c2 = key[31] >= 128;
                 if (has_c2) {
@@ -148,75 +181,67 @@ const LastLevelNode = struct {
 
         // serialize commitments if they are required
         if (has_c1) {
-            proof_items.cis.append(self.c1);
-            proof_items.zis.append(2);
-            proof_items.yis.append(Element.mapToScalarField(self.c1));
+            try proof_items.cis.append(self.c1.?);
+            try proof_items.zis.append(2);
+            try proof_items.yis.append(Element.mapToScalarField(self.c1.?.*));
         }
         if (has_c2) {
-            proof_items.cis.append(self.c2);
-            proof_items.zis.append(3);
-            proof_items.yis.append(Element.mapToScalarField(self.c2));
+            try proof_items.cis.append(self.c2.?);
+            try proof_items.zis.append(3);
+            try proof_items.yis.append(Element.mapToScalarField(self.c2.?.*));
         }
 
         // second pass: add the Cn-level elements
         for (keys) |key| {
             // another present stem proves the absence of this stem
-            if (!std.mem.eql(u8, key[0..31], self.stem)) {
+            if (!std.mem.eql(u8, key[0..31], self.stem[0..])) {
                 if (proof_items.esses.items.len == 0) {
-                    proof_items.poas.append(&self.stem);
-                    proof_items.esses.append(ExtStatus.Other | self.depth << 3);
+                    try proof_items.poas.append(self.stem);
+                    try proof_items.esses.append(@intFromEnum(ExtStatus.Other) | self.depth << 3);
                 }
-                proof_items.values.append(null);
+                try proof_items.values.append(null);
                 continue;
             }
 
             // corner case: if a proof-of-absence stem was found, and the same stem is used as a proof-of-presence, clear the list.
-            if (proof_items.poass.len > 0) {
-                proof_items.poass = null; // find a way to clear this list
-                proof_items.esses = null; // find a way to clear this list
+            if (proof_items.poas.items.len > 0) {
+                proof_items.poas.clearAndFree();
+                proof_items.esses.clearAndFree();
             }
             const suffix = key[31];
-            var suffix_poly: [128]?*Slot = undefined;
-            const count = try fillSuffixTreePoly(&suffix_poly, if (suffix >= 128) {
-                self.values[0..128];
-            } else {
-                self.values[128..256];
-            });
+            var suffix_poly: [256]Fr = [_]Fr{Fr.zero()} ** 256;
+            var subrange_start: usize = 0;
+            var subrange_end: usize = 128;
+            if (suffix >= 128) {
+                subrange_start = 128;
+                subrange_end = 256;
+            }
+            const count = try fillSuffixTreePoly(&suffix_poly, self.values[subrange_start..subrange_end]);
 
             // proof of absence: case of a missing suffix tree.
             if (count == 0) {
-                proof_items.esses.append(ExtStatus.Empty | self.depth << 3);
-                proof_items.values.append(null);
+                try proof_items.esses.append(@intFromEnum(ExtStatus.Empty) | self.depth << 3);
+                try proof_items.values.append(null);
                 continue;
             }
 
             // leaf is present
-            proof_items.cis.append(if (suffix < 128) {
-                self.c1;
+            var cn: *Element = undefined;
+            if (suffix < 128) {
+                cn = self.c1.?;
             } else {
-                self.c2;
-            });
-            proof_items.cis.append(if (suffix < 128) {
-                self.c1;
-            } else {
-                self.c2;
-            });
-            proof_items.zis.append(2 * suffix);
-            proof_items.zis.append(2 * suffix + 1);
-            proof_items.yis.append(if (self.values[suffix]) {
-                suffix_poly[2 * suffix];
-            } else {
-                Fr.zero;
-            });
-            proof_items.yis.append(if (self.values[suffix]) {
-                suffix_poly[2 * suffix + 1];
-            } else {
-                Fr.zero;
-            });
-            proof_items.values.append(self.values[suffix]);
+                cn = self.c2.?;
+            }
+            try proof_items.cis.append(cn);
+            try proof_items.cis.append(cn);
+            try proof_items.zis.append(2 * suffix);
+            try proof_items.zis.append(2 * suffix + 1);
+            try proof_items.yis.append(suffix_poly[2 * suffix]);
+            try proof_items.yis.append(suffix_poly[2 * suffix + 1]);
+            try proof_items.values.append(self.values[suffix]);
 
-            if (proof_items.esses.len == 0 or proof_items.esses.items[proof_items.esses.len - 1] != ExtStatus.Present | self.depth << 3) {
-                proof_items.esses.append(ExtStatus.Present | self.depth << 3);
+            if (proof_items.esses.items.len == 0 or proof_items.esses.items[proof_items.esses.items.len - 1] != @intFromEnum(ExtStatus.Present) | self.depth << 3) {
+                try proof_items.esses.append(@intFromEnum(ExtStatus.Present) | self.depth << 3);
             }
         }
         return proof_items;
@@ -243,20 +268,23 @@ const BranchNode = struct {
         return self.crs.commit(vals[0..]);
     }
 
-    fn getProofItems(self: *const BranchNode, keys: []const Key) !ProofItems {
+    fn getProofItems(self: *const BranchNode, keys: []const Key, alloc: Allocator) !ProofItems {
         var groupstart: usize = 0;
         // TODO initialize with my proof info
-        var proof_items = ProofItems{};
+        var proof_items = ProofItems.init(alloc);
+        errdefer proof_items.deinit();
+
         while (groupstart < keys.len) {
             var groupend = groupstart;
             while (groupend < keys.len and keys[groupend][self.depth] == keys[groupstart][self.depth]) {
                 groupend += 1;
             }
 
-            const child_proof_items = self.children[keys[groupstart][self.depth]].getProofItems(keys[groupstart..groupend]);
+            const child_proof_items = try self.children[keys[groupstart][self.depth]].getProofItems(keys[groupstart..groupend], alloc);
 
-            proof_items.merge(child_proof_items);
+            try proof_items.merge(&child_proof_items);
         }
+        return proof_items;
     }
 };
 
@@ -264,8 +292,8 @@ fn newll(key: Key, value: *const Slot, allocator: Allocator, crs: *CRS) !*LastLe
     const slot = key[31];
     var ll = try allocator.create(LastLevelNode);
     ll.values = [_]?*Slot{null} ** 256;
-    ll.key = [_]u8{0} ** 31;
-    std.mem.copy(u8, ll.key[0..], key[0..31]);
+    ll.stem = [_]u8{0} ** 31;
+    std.mem.copy(u8, ll.stem[0..], key[0..31]);
     ll.values[slot] = try allocator.create(Slot);
     std.mem.copy(u8, ll.values[slot].?[0..], value[0..]);
     ll.crs = crs;
@@ -302,7 +330,7 @@ const Node = union(enum) {
             .empty => null,
             .hash => error.ReadFromHash,
             .last_level => |ll| {
-                if (!std.mem.eql(u8, key[0..31], ll.key[0..31])) {
+                if (!std.mem.eql(u8, key[0..31], ll.stem[0..31])) {
                     return null;
                 }
 
@@ -324,7 +352,7 @@ const Node = union(enum) {
                 // Check if the stems are the same, if so, then just place the value
                 // in the corresponding slot, as the final extension tree has been
                 // reached.
-                const diffidx = std.mem.indexOfDiff(u8, ll.key[0..], key[0..31]);
+                const diffidx = std.mem.indexOfDiff(u8, ll.stem[0..], key[0..31]);
                 if (diffidx == null) {
                     ll.values[key[31]] = try allocator.create(Slot);
                     std.mem.copy(u8, ll.values[key[31]].?[0..], value[0..]);
@@ -335,7 +363,7 @@ const Node = union(enum) {
                 br.children = [_]Node{Node{ .empty = .{} }} ** 256;
                 br.depth = depth;
                 br.count = 2;
-                br.children[ll.key[br.depth]] = Node{ .last_level = ll };
+                br.children[ll.stem[br.depth]] = Node{ .last_level = ll };
                 br.crs = crs;
                 self.* = @unionInit(Node, "branch", br);
                 // Recurse into the child, if this is empty then it will be turned
@@ -411,7 +439,7 @@ const Node = union(enum) {
                 }
             },
             .last_level => |ll| {
-                try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\\nS: {}\"]\n", .{ me, std.fmt.fmtSliceHexLower(&hash), std.fmt.fmtSliceHexLower(&ll.key) });
+                try std.fmt.format(str.writer(), "{s} [label=\"I: {s}\\nS: {}\"]\n", .{ me, std.fmt.fmtSliceHexLower(&hash), std.fmt.fmtSliceHexLower(&ll.stem) });
 
                 for (ll.values, 0..) |val, validx| {
                     if (val) |value| {
@@ -433,10 +461,10 @@ const Node = union(enum) {
         }
     }
 
-    fn getProofItems(self: *const Node, keys: []const Key) !ProofItems {
+    fn getProofItems(self: *const Node, keys: []const Key, alloc: Allocator) anyerror!ProofItems {
         return switch (self.*) {
-            .branch => |br| br.getProofItems(keys),
-            .last_level => |ll| ll.getProofItems(keys),
+            .branch => |br| br.getProofItems(keys, alloc),
+            .last_level => |ll| ll.getProofItems(keys, alloc),
             else => error.NotImplemented,
         };
     }
@@ -750,5 +778,5 @@ test "get proof items for a tree with 3 values, 1 in each branch" {
         try root.insert(key, values[i], testing.allocator, &crs);
     }
 
-    try root.getProofItems(keys[0..1]);
+    _ = try root.getProofItems(keys[0..1], testing.allocator);
 }
