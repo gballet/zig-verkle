@@ -1,6 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const curve = std.crypto.ecc.Edwards25519;
 const verkle_crypto = @import("verkle-crypto");
 const banderwagon = verkle_crypto.banderwagon;
@@ -15,7 +16,25 @@ const Key = [32]u8;
 const Stem = [31]u8;
 const Hash = [32]u8;
 
+const ExtStatus = enum {
+    Empty,
+    Other,
+    Present,
+};
+
 const ProofItems = struct {
+    cis: ArrayList(*Element),
+    yis: ArrayList(?Fr),
+    zis: ArrayList(u8),
+    // don't support stateful proofs just yet
+    // fis: *ArrayList(ArrayList(*Fr)),
+
+    esses: ArrayList(u8),
+    poas: ArrayList(Stem),
+    values: ArrayList(?*Slot),
+
+    const Self = @This();
+
     fn merge(self: *ProofItems, other: *const ProofItems) !void {
         _ = other;
         _ = self;
