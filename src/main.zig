@@ -45,6 +45,9 @@ const LastLevelNode = struct {
     values: [256]?*Slot,
     stem: Stem,
     crs: *CRS,
+    c1: ?*Element,
+    c2: ?*Element,
+    depth: u8,
 
     fn computeSuffixNodeCommitment(crs: *CRS, values: []const ?*Slot) !Element {
         if (values.len != 128) {
