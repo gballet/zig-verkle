@@ -642,13 +642,13 @@ test "rebuild tree from proof" {
     // defer statediffs.deinit();
 
     // currently hardcode the data
-    const depths_and_ext_statuses = [_]u8{ 2 | 1 << 3, 0 };
+    // const depths_and_ext_statuses = [_]u8{ 2 | 1 << 3, 0 };
     // const poa_stems = [_]Stem{ [_]u8{64} ** 31, [_]u8{0} ** 31 };
     // const commitments = [_]*Element{};
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
 
-    var tree = try preTreeFromWitness(ew.state_diff.items, &depths_and_ext_statuses, ew.verkle_proof.other_stems.items, ew.verkle_proof.commitments_by_path.items, testing.allocator, &crs);
+    var tree = try preTreeFromWitness(ew.state_diff.items, &ew.verkle_proof.depth_and_presence, ew.verkle_proof.other_stems.items, ew.verkle_proof.commitments_by_path.items, testing.allocator, &crs);
     defer tree.tear_down(testing.allocator);
 
     var list = std.ArrayList(u8).init(testing.allocator);
