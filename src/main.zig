@@ -379,7 +379,7 @@ const IPAProof = struct {
 
 const VerkleProof = struct {
     other_stems: ArrayList(Stem),
-    depth_and_presence: ArrayList(u8),
+    depth_and_presence: []u8,
     commitments_by_path: ArrayList(Element),
     d: Element,
     ipa_proof: IPAProof,
@@ -396,6 +396,11 @@ const ExecutionWitness = struct {
             self.allocator.free(state_diff.suffix_diffs);
         }
         self.state_diff.deinit();
+
+        self.verkle_proof.other_stems.deinit();
+        self.verkle_proof.commitments_by_path.deinit();
+        self.allocator.free(self.verkle_proof.depth_and_presence);
+
         self.allocator.destroy(self);
     }
 };
@@ -615,6 +620,9 @@ fn executionWitnessFromJSON(payload: []const u8, allocator: std.mem.Allocator) !
         _ = try std.fmt.hexToBytes(&stem, o[2..]);
         try ew.verkle_proof.other_stems.append(stem);
     }
+
+    ew.verkle_proof.depth_and_presence = try allocator.alloc(u8, (decoded.value.verkleProof.depthExtensionPresent.len - 2) / 2);
+    _ = try std.fmt.hexToBytes(ew.verkle_proof.depth_and_presence, decoded.value.verkleProof.depthExtensionPresent[2..]);
 
     return ew;
 }
