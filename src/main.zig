@@ -49,6 +49,7 @@ const LastLevelNode = struct {
     c1: ?*Element,
     c2: ?*Element,
     depth: u8,
+    commitment: ?*Element,
 
     fn computeSuffixNodeCommitment(crs: *CRS, values: []const ?*Slot) !Element {
         if (values.len != 128) {
@@ -456,12 +457,27 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
 
                 // end of the line: insert a leaf with all present values
                 var ll = try newemptyll(stem, depth, alloc, crs);
+                ll.commitment = &commitments[commitment_index];
+                commitment_index += 1;
                 node.children[stem[depth]] = Node{ .last_level = ll };
                 for (statediffs[statediff_index].suffix_diffs) |suffix_diff| {
                     // will be left to `null` if suffix_dixx.current_value is `null`.
                     if (suffix_diff.current_value) |sdiff| {
                         ll.values[suffix_diff.suffix] = try alloc.create(Slot);
                         std.mem.copy(u8, ll.values[suffix_diff.suffix].?, &sdiff);
+                    }
+
+                    // consume another commitment if c1 or c2 is needed, and hasn't been set.
+                    if (suffix_diff.suffix < 128) {
+                        if (ll.c1 == null) {
+                            ll.c1 = &commitments[commitment_index];
+                            commitment_index += 1;
+                        }
+                    } else {
+                        if (ll.c2 == null) {
+                            ll.c2 = &commitments[commitment_index];
+                            commitment_index += 1;
+                        }
                     }
                 }
             },
@@ -509,12 +525,27 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
 
                 // end of the line: insert a leaf with all present values
                 var ll = try newemptyll(stem, depth, alloc, crs);
+                ll.commitment = &commitments[commitment_index];
+                commitment_index += 1;
                 node.children[stem[depth]] = Node{ .last_level = ll };
                 for (statediffs[statediff_index].suffix_diffs) |suffix_diff| {
                     // will be left to `null` if suffix_dixx.current_value is `null`.
                     if (suffix_diff.current_value) |sdiff| {
                         ll.values[suffix_diff.suffix] = try alloc.create(Slot);
                         std.mem.copy(u8, ll.values[suffix_diff.suffix].?, &sdiff);
+                    }
+
+                    // consume another commitment if c1 or c2 is needed, and hasn't been set.
+                    if (suffix_diff.suffix < 128) {
+                        if (ll.c1 == null) {
+                            ll.c1 = &commitments[commitment_index];
+                            commitment_index += 1;
+                        }
+                    } else {
+                        if (ll.c2 == null) {
+                            ll.c2 = &commitments[commitment_index];
+                            commitment_index += 1;
+                        }
                     }
                 }
             },
