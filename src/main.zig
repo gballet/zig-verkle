@@ -42,6 +42,7 @@ const ProofItems = struct {
 };
 
 const LastLevelNode = struct {
+    // TODO remove pointer
     values: [256]?*Slot,
     stem: Stem,
     crs: *CRS,
@@ -192,18 +193,17 @@ const Node = union(enum) {
 
     empty: struct {},
     unresolved: struct {}, // indicate a subtree that was not resolved
-    poa_stub: *Stem, // indicate an unresolved LEAF tree whose stem is known
+    poa_stub: *const Stem, // indicate an unresolved LEAF tree whose stem is known
 
     fn new(allocator: Allocator, crs: *CRS) !@This() {
-        var children: [256]Node = undefined;
-        for (children, 0..) |_, idx| {
-            children[idx] = Node{ .empty = .{} };
-        }
         var br = try allocator.create(BranchNode);
+        for (br.children, 0..) |_, idx| {
+            br.children[idx] = Node{ .empty = .{} };
+        }
         br.crs = crs;
         br.depth = 0;
         br.count = 0;
-        br.children = children;
+        br.commitment = null;
         return @This(){ .branch = br };
     }
 
@@ -422,7 +422,7 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
     var poa_stem_index: usize = 0;
     var commitment_index: usize = 0;
 
-    for (depths_and_ext_statuses) |depth_and_ext_status| {
+    for (depths_and_ext_statuses, 0..) |depth_and_ext_status, idx| {
         const depth = depth_and_ext_status >> 3;
         const ext_status: ExtStatus = @enumFromInt(depth_and_ext_status & 3);
 
@@ -439,7 +439,7 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
 
                 // Walk the tree depth in order to consume non-initialized commitments
                 var node: *BranchNode = root.branch;
-                for (0..depth) |d| {
+                for (0..depth - 1) |d| {
                     if (node.commitment == null) {
                         // consume commitment
                         node.commitment = &commitments[commitment_index];
@@ -447,50 +447,11 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
                     }
 
                     // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
-                    if (d < depth - 1 and node.children[stem[d]] == .empty) {
-                        node.children[stem[d]].branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc);
-                    }
-                }
-
-                // "consume" a state diff
-                statediff_index += 1;
-            },
-            .Other => {
-                const stem = poa_stems[poa_stem_index];
-
-                // Walk the tree depth in order to consume non-initialized commitments
-                var node: *BranchNode = root.branch;
-                for (0..depth) |d| {
-                    if (node.commitment == null) {
-                        commitment_index += 1;
+                    if (node.children[stem[d]] == .empty) {
+                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
                     }
 
-                    // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
-                    if (d < depth - 1 and node.children[stem[d]] == .empty) {
-                        node.children[stem[d]].branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc);
-                    }
-                }
-
-                // end of the line: insert a proof of stem marker
-                node.children[stem[depth]].poa_stub.* = stem;
-
-                // "consume" a PoA stem
-                poa_stem_index += 1;
-            },
-            .Present => {
-                const stem = statediffs[statediff_index].stem;
-
-                // Walk the tree depth in order to consume non-initialized commitments
-                var node: *BranchNode = root.branch;
-                for (0..depth) |d| {
-                    if (node.commitment == null) {
-                        commitment_index += 1;
-                    }
-
-                    // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
-                    if (d < depth - 1 and node.children[stem[d]] == .empty) {
-                        node.children[stem[d]].branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc);
-                    }
+                    node = node.children[stem[d]].branch;
                 }
 
                 // end of the line: insert a leaf with all present values
@@ -503,11 +464,64 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
                         std.mem.copy(u8, ll.values[suffix_diff.suffix].?, &sdiff);
                     }
                 }
+            },
+            .Other => {
+                const stem = &poa_stems[poa_stem_index];
 
-                // "consume" a state diff
-                statediff_index += 1;
+                // Walk the tree depth in order to consume non-initialized commitments
+                var node: *BranchNode = root.branch;
+                for (0..depth - 1) |d| {
+                    if (node.commitment == null) {
+                        commitment_index += 1;
+                    }
+
+                    // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
+                    if (node.children[stem[d]] == .empty) {
+                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
+                    }
+
+                    node = node.children[stem[d]].branch;
+                }
+
+                // end of the line: insert a proof of stem marker
+                node.children[stem[depth]] = .{ .poa_stub = stem };
+
+                // "consume" a PoA stem
+                poa_stem_index += 1;
+            },
+            .Present => {
+                const stem = statediffs[statediff_index].stem;
+
+                // Walk the tree depth in order to consume non-initialized commitments
+                var node: *BranchNode = root.branch;
+                for (0..depth - 1) |d| {
+                    if (node.commitment == null) {
+                        commitment_index += 1;
+                    }
+
+                    // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
+                    if (node.children[stem[d]] == .empty) {
+                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
+                    }
+
+                    node = node.children[stem[d]].branch;
+                }
+
+                // end of the line: insert a leaf with all present values
+                var ll = try newemptyll(stem, depth, alloc, crs);
+                node.children[stem[depth]] = Node{ .last_level = ll };
+                for (statediffs[statediff_index].suffix_diffs) |suffix_diff| {
+                    // will be left to `null` if suffix_dixx.current_value is `null`.
+                    if (suffix_diff.current_value) |sdiff| {
+                        ll.values[suffix_diff.suffix] = try alloc.create(Slot);
+                        std.mem.copy(u8, ll.values[suffix_diff.suffix].?, &sdiff);
+                    }
+                }
             },
         }
+
+        // "consume" a state diff
+        statediff_index += 1;
     }
 
     // Sanity check: ensure all commitments have been consumed.
@@ -517,37 +531,6 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
     }
 
     return root;
-}
-
-fn stateDiffsFromJSON(payload: []const u8, allocator: std.mem.Allocator) !ArrayList(StemStateDiff) {
-    const json = std.json;
-    var statediffs = ArrayList(StemStateDiff).init(allocator);
-    const T = []struct { stem: []u8, suffixDiffs: []struct { suffix: u8, currentValue: ?[]u8, newValue: ?[]u8 } };
-    var decoded = try json.parseFromSlice(T, allocator, payload, .{ .ignore_unknown_fields = true });
-    defer decoded.deinit();
-    for (decoded.value) |statediff| {
-        var new_stem_state_diff: StemStateDiff = StemStateDiff{ .stem = [_]u8{0} ** 31, .suffix_diffs = try allocator.alloc(SuffixDiff, statediff.suffixDiffs.len) };
-        _ = try std.fmt.hexToBytes(new_stem_state_diff.stem[0..], statediff.stem[2..]);
-        for (statediff.suffixDiffs, 0..) |suffixdiff, i| {
-            new_stem_state_diff.suffix_diffs[i].suffix = suffixdiff.suffix;
-            if (suffixdiff.currentValue) |cv| {
-                new_stem_state_diff.suffix_diffs[i].current_value = [_]u8{0} ** 32;
-                _ = try std.fmt.hexToBytes(new_stem_state_diff.suffix_diffs[i].current_value.?[0..], cv[2..]);
-            } else {
-                // TODO check if I can use a default value instead, but that has some downstream implications that I need to master
-                new_stem_state_diff.suffix_diffs[i].current_value = null;
-            }
-            if (suffixdiff.newValue) |nv| {
-                new_stem_state_diff.suffix_diffs[i].new_value = [_]u8{0} ** 32;
-                _ = try std.fmt.hexToBytes(new_stem_state_diff.suffix_diffs[i].new_value.?[0..], nv[2..]);
-            } else {
-                new_stem_state_diff.suffix_diffs[i].new_value = null;
-            }
-        }
-        try statediffs.append(new_stem_state_diff);
-    }
-
-    return statediffs;
 }
 
 fn executionWitnessFromJSON(payload: []const u8, allocator: std.mem.Allocator) !*ExecutionWitness {
@@ -648,7 +631,7 @@ test "rebuild tree from proof" {
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
 
-    var tree = try preTreeFromWitness(ew.state_diff.items, &ew.verkle_proof.depth_and_presence, ew.verkle_proof.other_stems.items, ew.verkle_proof.commitments_by_path.items, testing.allocator, &crs);
+    var tree = try preTreeFromWitness(ew.state_diff.items, ew.verkle_proof.depth_and_presence, ew.verkle_proof.other_stems.items, ew.verkle_proof.commitments_by_path.items, testing.allocator, &crs);
     defer tree.tear_down(testing.allocator);
 
     var list = std.ArrayList(u8).init(testing.allocator);
