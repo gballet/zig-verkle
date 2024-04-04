@@ -187,6 +187,11 @@ fn newemptyll(stem: Stem, depth: u8, allocator: Allocator, crs: *CRS) !*LastLeve
     return ll;
 }
 
+const PoAStub = struct {
+    stem: *const Stem,
+    commitment: ?*Element,
+};
+
 const Node = union(enum) {
     last_level: *LastLevelNode,
     branch: *BranchNode,
@@ -194,7 +199,7 @@ const Node = union(enum) {
 
     empty: struct {},
     unresolved: struct {}, // indicate a subtree that was not resolved
-    poa_stub: *const Stem, // indicate an unresolved LEAF tree whose stem is known
+    poa_stub: PoAStub, // indicate an unresolved LEAF tree whose stem is known
 
     fn new(allocator: Allocator, crs: *CRS) !@This() {
         var br = try allocator.create(BranchNode);
@@ -418,12 +423,14 @@ fn newEmptyBranchNode(depth: u8, crs: *CRS, allocator: Allocator) !*BranchNode {
 
 pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []const u8, poa_stems: []const Stem, commitments: []Element, alloc: Allocator, crs: *CRS) !Node {
     var root = try Node.new(alloc, crs);
+    root.branch.commitment = &commitments[0];
     errdefer root.tear_down(alloc);
+
     var statediff_index: usize = 0;
     var poa_stem_index: usize = 0;
-    var commitment_index: usize = 0;
+    var commitment_index: usize = 1; // 1 since the first commitment has been consumed by the root node.
 
-    for (depths_and_ext_statuses, 0..) |depth_and_ext_status, idx| {
+    for (depths_and_ext_statuses) |depth_and_ext_status| {
         const depth = depth_and_ext_status >> 3;
         const ext_status: ExtStatus = @enumFromInt(depth_and_ext_status & 3);
 
@@ -441,18 +448,18 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
                 // Walk the tree depth in order to consume non-initialized commitments
                 var node: *BranchNode = root.branch;
                 for (0..depth - 1) |d| {
-                    if (node.commitment == null) {
-                        // consume commitment
-                        node.commitment = &commitments[commitment_index];
-                        commitment_index += 1;
-                    }
-
                     // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
                     if (node.children[stem[d]] == .empty) {
                         node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
                     }
 
                     node = node.children[stem[d]].branch;
+
+                    if (node.commitment == null) {
+                        // consume commitment
+                        node.commitment = &commitments[commitment_index];
+                        commitment_index += 1;
+                    }
                 }
 
                 // end of the line: insert a leaf with all present values
@@ -487,20 +494,22 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
                 // Walk the tree depth in order to consume non-initialized commitments
                 var node: *BranchNode = root.branch;
                 for (0..depth - 1) |d| {
-                    if (node.commitment == null) {
-                        commitment_index += 1;
-                    }
-
                     // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
                     if (node.children[stem[d]] == .empty) {
                         node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
                     }
 
                     node = node.children[stem[d]].branch;
+
+                    if (node.commitment == null) {
+                        node.commitment = &commitments[commitment_index];
+                        commitment_index += 1;
+                    }
                 }
 
                 // end of the line: insert a proof of stem marker
-                node.children[stem[depth]] = .{ .poa_stub = stem };
+                node.children[stem[depth]] = .{ .poa_stub = .{ .stem = stem, .commitment = &commitments[commitment_index] } };
+                commitment_index += 1;
 
                 // "consume" a PoA stem
                 poa_stem_index += 1;
@@ -511,16 +520,17 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
                 // Walk the tree depth in order to consume non-initialized commitments
                 var node: *BranchNode = root.branch;
                 for (0..depth - 1) |d| {
-                    if (node.commitment == null) {
-                        commitment_index += 1;
-                    }
-
                     // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
                     if (node.children[stem[d]] == .empty) {
                         node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
                     }
 
                     node = node.children[stem[d]].branch;
+
+                    if (node.commitment == null) {
+                        node.commitment = &commitments[commitment_index];
+                        commitment_index += 1;
+                    }
                 }
 
                 // end of the line: insert a leaf with all present values
