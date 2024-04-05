@@ -662,10 +662,6 @@ test "rebuild tree from proof" {
     _ = try std.fmt.hexToBytes(presentkey[0..], "0e88cc6bf033a3ff779335e720d5a7edf907cc70ab7ff31375cd485db779fc00");
     const present = try tree.get(presentkey);
     try testing.expect(present != null);
-
-    // for (statediffs.items) |statediff| {
-    //     testing.allocator.free(statediff.suffix_diffs);
-    // }
 }
 
 // test "testing toDot" {
