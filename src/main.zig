@@ -135,6 +135,11 @@ const BranchNode = struct {
     commitment: ?*Element,
 
     fn computeCommitment(self: *const BranchNode) anyerror!Element {
+        if (self.commitment != null) {
+            // TODO return a pointer instead
+            return self.commitment.?.*;
+        }
+
         var vals: [256]Fr = undefined;
 
         for (self.children, 0..) |child, i| {
@@ -190,6 +195,10 @@ fn newemptyll(stem: Stem, depth: u8, allocator: Allocator, crs: *CRS) !*LastLeve
 const PoAStub = struct {
     stem: *const Stem,
     commitment: ?*Element,
+
+    fn computeCommitment(self: *const PoAStub) anyerror!Element {
+        return self.commitment.?.*;
+    }
 };
 
 const Node = union(enum) {
@@ -298,7 +307,8 @@ const Node = union(enum) {
             .hash => |_| error.NeedToReworkHashedNodes,
             .last_level => |ll| ll.computeCommitment(),
             .branch => |br| br.computeCommitment(),
-            .unresolved, .poa_stub => error.CannotComputeUnresolvedCommitment,
+            .unresolved => error.CannotComputeUnresolvedCommitment,
+            .poa_stub => |ps| ps.computeCommitment(),
         };
     }
 
@@ -423,12 +433,12 @@ fn newEmptyBranchNode(depth: u8, crs: *CRS, allocator: Allocator) !*BranchNode {
 
 pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []const u8, poa_stems: []const Stem, commitments: []Element, alloc: Allocator, crs: *CRS) !Node {
     var root = try Node.new(alloc, crs);
-    root.branch.commitment = &commitments[0];
+    // TODO set root commitment from parameters
     errdefer root.tear_down(alloc);
 
     var statediff_index: usize = 0;
     var poa_stem_index: usize = 0;
-    var commitment_index: usize = 1; // 1 since the first commitment has been consumed by the root node.
+    var commitment_index: usize = 0;
 
     for (depths_and_ext_statuses) |depth_and_ext_status| {
         const depth = depth_and_ext_status >> 3;
@@ -450,7 +460,7 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
                 for (0..depth - 1) |d| {
                     // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
                     if (node.children[stem[d]] == .empty) {
-                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
+                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)) + 1, crs, alloc) };
                     }
 
                     node = node.children[stem[d]].branch;
@@ -461,7 +471,6 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
                         commitment_index += 1;
                     }
                 }
-
             },
             .Other => {
                 const stem = &poa_stems[poa_stem_index];
@@ -471,7 +480,7 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
                 for (0..depth - 1) |d| {
                     // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
                     if (node.children[stem[d]] == .empty) {
-                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
+                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)) + 1, crs, alloc) };
                     }
 
                     node = node.children[stem[d]].branch;
@@ -494,10 +503,10 @@ pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []con
 
                 // Walk the tree depth in order to consume non-initialized commitments
                 var node: *BranchNode = root.branch;
-                for (0..depth - 1) |d| {
+                for (0..depth) |d| {
                     // Add next node in the path if it doesn't exist, unless this is the last one as this is a proof of absence
                     if (node.children[stem[d]] == .empty) {
-                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)), crs, alloc) };
+                        node.children[stem[d]] = .{ .branch = try newEmptyBranchNode(@as(u8, @intCast(d)) + 1, crs, alloc) };
                     }
 
                     node = node.children[stem[d]].branch;
@@ -633,17 +642,6 @@ test "rebuild tree from proof" {
     const execution_witness_json = @embedFile("./kaustinen_5_block_34171.json");
     var ew = try executionWitnessFromJSON(execution_witness_json, testing.allocator);
     defer ew.deinit();
-    // for (ew.state_diff.items) |sd| {
-    //     std.debug.print("{any}\n", .{sd});
-    // }
-
-    // const statediffs = try stateDiffsFromJSON(state_diffs_json, testing.allocator);
-    // defer statediffs.deinit();
-
-    // currently hardcode the data
-    // const depths_and_ext_statuses = [_]u8{ 2 | 1 << 3, 0 };
-    // const poa_stems = [_]Stem{ [_]u8{64} ** 31, [_]u8{0} ** 31 };
-    // const commitments = [_]*Element{};
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
 
@@ -655,11 +653,15 @@ test "rebuild tree from proof" {
     try tree.toDot(&list, "", "");
     std.debug.print("{s}\n", .{list.items[0..]});
 
-    // const present = try tree.get([_]u8{0} ** 32);
-    // try testing.expect(present != null);
+    var absentkey: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(absentkey[0..], "038c7bc853b037e3fc63b284f422c115891b9a79bfee6c87e7006f3ca4e1a800");
+    const absent = try tree.get(absentkey);
+    try testing.expect(absent == null);
 
-    // const absent = try tree.get([_]u8{64} ++ [_]u8{0} ** 31);
-    // try testing.expect(absent == null);
+    var presentkey: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(presentkey[0..], "0e88cc6bf033a3ff779335e720d5a7edf907cc70ab7ff31375cd485db779fc00");
+    const present = try tree.get(presentkey);
+    try testing.expect(present != null);
 
     // for (statediffs.items) |statediff| {
     //     testing.allocator.free(statediff.suffix_diffs);
