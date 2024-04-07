@@ -7,7 +7,6 @@ const banderwagon = verkle_crypto.banderwagon;
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 const CRS = verkle_crypto.crs.CRS;
-const CRS_Domain = verkle_crypto.crs.Domain;
 const copy = std.mem.copy;
 const types = @import("./types.zig");
 
@@ -92,7 +91,7 @@ const LastLevelNode = struct {
         vals[0] = Fr.fromInteger(1);
 
         var stem = [_]u8{0} ** Fr.BytesSize;
-        std.mem.copy(u8, stem[0..], self.stem[0..31]);
+        copy(u8, stem[0..], self.stem[0..31]);
         vals[1] = Fr.fromBytes(stem);
 
         const c1 = try computeSuffixNodeCommitment(self.crs, self.values[0..128]);
@@ -167,9 +166,9 @@ fn newll(key: Key, value: *const Slot, allocator: Allocator, crs: *CRS) !*LastLe
     var ll = try allocator.create(LastLevelNode);
     ll.values = [_]?*Slot{null} ** 256;
     ll.stem = [_]u8{0} ** 31;
-    std.mem.copy(u8, ll.stem[0..], key[0..31]);
+    copy(u8, ll.stem[0..], key[0..31]);
     ll.values[slot] = try allocator.create(Slot);
-    std.mem.copy(u8, ll.values[slot].?[0..], value[0..]);
+    copy(u8, ll.values[slot].?[0..], value[0..]);
     ll.crs = crs;
     return ll;
 }
@@ -229,7 +228,7 @@ const Node = union(enum) {
                 const diffidx = std.mem.indexOfDiff(u8, ll.stem[0..], key[0..31]);
                 if (diffidx == null) {
                     ll.values[key[31]] = try allocator.create(Slot);
-                    std.mem.copy(u8, ll.values[key[31]].?[0..], value[0..]);
+                    copy(u8, ll.values[key[31]].?[0..], value[0..]);
                     return;
                 }
 
