@@ -2,7 +2,6 @@ const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const curve = std.crypto.ecc.Edwards25519;
 const verkle_crypto = @import("verkle-crypto");
 const banderwagon = verkle_crypto.banderwagon;
 const Element = banderwagon.Element;
