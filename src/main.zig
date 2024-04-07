@@ -10,11 +10,12 @@ const Fr = banderwagon.Fr;
 const CRS = verkle_crypto.crs.CRS;
 const CRS_Domain = verkle_crypto.crs.Domain;
 const copy = std.mem.copy;
+const types = @import("./types.zig");
 
-const Slot = [32]u8;
-const Key = [32]u8;
-const Stem = [31]u8;
-const Hash = [32]u8;
+const Slot = types.Slot;
+const Stem = types.Stem;
+const Key = types.Key;
+const Hash = types.Hash;
 
 const ExtStatus = enum {
     Empty,
