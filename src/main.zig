@@ -321,7 +321,6 @@ const Node = union(enum) {
         };
     }
 
-    // TODO remove allocator
     fn toDot(self: *const Node, str: *std.ArrayList(u8), path: []const u8, parent: []const u8) !void {
         const comm = try self.commitment();
         const hash = comm.mapToScalarField().toBytes();
