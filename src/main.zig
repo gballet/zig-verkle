@@ -431,11 +431,10 @@ fn newEmptyBranchNode(depth: u8, crs: *CRS, allocator: Allocator) !*BranchNode {
     return br;
 }
 
-pub fn preTreeFromWitness(statediffs: StateDiffs, depths_and_ext_statuses: []const u8, poa_stems: []const Stem, commitments: []Element, alloc: Allocator, crs: *CRS) !Node {
+pub fn preTreeFromWitness(parent_root_comm: *Element, statediffs: StateDiffs, depths_and_ext_statuses: []const u8, poa_stems: []const Stem, commitments: []Element, alloc: Allocator, crs: *CRS) !Node {
     var root = try Node.new(alloc, crs);
-    // TODO set root commitment from parameters
     errdefer root.tear_down(alloc);
-
+    root.branch.commitment = parent_root_comm;
     var statediff_index: usize = 0;
     var poa_stem_index: usize = 0;
     var commitment_index: usize = 0;
@@ -636,16 +635,16 @@ fn executionWitnessFromJSON(payload: []const u8, allocator: std.mem.Allocator) !
 }
 
 test "rebuild tree from proof" {
-    // const state_diffs_json = @embedFile("./statediff_to_rebuild_from.json");
-    // std.debug.print("state diff: {s}\n", .{state_diffs_json});
-
     const execution_witness_json = @embedFile("./kaustinen_5_block_34171.json");
     var ew = try executionWitnessFromJSON(execution_witness_json, testing.allocator);
     defer ew.deinit();
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
 
-    var tree = try preTreeFromWitness(ew.state_diff.items, ew.verkle_proof.depth_and_presence, ew.verkle_proof.other_stems.items, ew.verkle_proof.commitments_by_path.items, testing.allocator, &crs);
+    var root_hash: Hash = undefined;
+    _ = try std.fmt.hexToBytes(root_hash[0..], "67db21d8e7ce2b4783d8a94eab44140d84360504400f47aeb7a205fff683afe5");
+    var root_comm = try Element.fromBytes(root_hash);
+    var tree = try preTreeFromWitness(&root_comm, ew.state_diff.items, ew.verkle_proof.depth_and_presence, ew.verkle_proof.other_stems.items, ew.verkle_proof.commitments_by_path.items, testing.allocator, &crs);
     defer tree.tear_down(testing.allocator);
 
     var list = std.ArrayList(u8).init(testing.allocator);
