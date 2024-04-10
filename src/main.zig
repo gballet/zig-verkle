@@ -664,288 +664,288 @@ test "rebuild tree from proof" {
     try testing.expect(present != null);
 }
 
-// test "testing toDot" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root: *Node = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
-//     var list = std.ArrayList(u8).init(testing.allocator);
-//     defer list.deinit();
+test "testing toDot" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root: *Node = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
+    var list = std.ArrayList(u8).init(testing.allocator);
+    defer list.deinit();
 
-//     try root.toDot(&list, "", "");
-//     std.debug.print("{s}\n", .{list.items[0..]});
-// }
+    try root.toDot(&list, "", "");
+    std.debug.print("{s}\n", .{list.items[0..]});
+}
 
-// test "inserting into hash raises an error" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = Node{ .hash = [_]u8{0} ** 32 };
-//     var root: *Node = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try testing.expectError(error.InsertIntoHash, root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs));
-// }
+test "inserting into hash raises an error" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = Node{ .hash = [_]u8{0} ** 32 };
+    var root: *Node = &root_;
+    var value = [_]u8{0} ** 32;
+    try testing.expectError(error.InsertIntoHash, root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs));
+}
 
-// test "insert into empty tree" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root: *Node = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
+test "insert into empty tree" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root: *Node = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
 
-//     switch (root.*) {
-//         Node.branch => |br| switch (br.children[0]) {
-//             Node.last_level => |ll| {
-//                 for (ll.values, 0..) |v, i| {
-//                     if (i == 0) {
-//                         try testing.expect(v != null);
-//                     } else {
-//                         try testing.expect(v == null);
-//                     }
-//                 }
-//             },
-//             else => return error.InvalidNodeType,
-//         },
-//         else => return error.InvalidNodeType,
-//     }
-// }
+    switch (root.*) {
+        Node.branch => |br| switch (br.children[0]) {
+            Node.last_level => |ll| {
+                for (ll.values, 0..) |v, i| {
+                    if (i == 0) {
+                        try testing.expect(v != null);
+                    } else {
+                        try testing.expect(v == null);
+                    }
+                }
+            },
+            else => return error.InvalidNodeType,
+        },
+        else => return error.InvalidNodeType,
+    }
+}
 
-// test "insert into a last_level node, difference in suffix" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     try root.insert([_]u8{0} ** 31 ++ [1]u8{1}, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
+test "insert into a last_level node, difference in suffix" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([_]u8{0} ** 31 ++ [1]u8{1}, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
 
-//     switch (root.*) {
-//         Node.branch => |br| switch (br.children[0]) {
-//             Node.last_level => |ll| {
-//                 for (ll.values, 0..) |v, i| {
-//                     if (i < 2) {
-//                         try testing.expect(v != null);
-//                     } else {
-//                         try testing.expect(v == null);
-//                     }
-//                 }
-//             },
-//             else => return error.InvalidNodeType,
-//         },
-//         else => return error.InvalidNodeType,
-//     }
-// }
+    switch (root.*) {
+        Node.branch => |br| switch (br.children[0]) {
+            Node.last_level => |ll| {
+                for (ll.values, 0..) |v, i| {
+                    if (i < 2) {
+                        try testing.expect(v != null);
+                    } else {
+                        try testing.expect(v == null);
+                    }
+                }
+            },
+            else => return error.InvalidNodeType,
+        },
+        else => return error.InvalidNodeType,
+    }
+}
 
-// test "insert into a last_level node, difference in stem" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
+test "insert into a last_level node, difference in stem" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
 
-//     switch (root.*) {
-//         Node.branch => |br| {
-//             for (br.children, 0..) |child, i| {
-//                 switch (child) {
-//                     Node.last_level => |ll| {
-//                         try testing.expect(i < 2);
-//                         for (ll.values, 0..) |v, j| {
-//                             if (j == 0) {
-//                                 try testing.expect(v != null);
-//                             } else {
-//                                 try testing.expect(v == null);
-//                             }
-//                         }
-//                     },
-//                     Node.empty => try testing.expect(i >= 2),
-//                     else => return error.InvalidNodeType,
-//                 }
-//             }
-//         },
-//         else => return error.InvalidNodeType,
-//     }
-// }
+    switch (root.*) {
+        Node.branch => |br| {
+            for (br.children, 0..) |child, i| {
+                switch (child) {
+                    Node.last_level => |ll| {
+                        try testing.expect(i < 2);
+                        for (ll.values, 0..) |v, j| {
+                            if (j == 0) {
+                                try testing.expect(v != null);
+                            } else {
+                                try testing.expect(v == null);
+                            }
+                        }
+                    },
+                    Node.empty => try testing.expect(i >= 2),
+                    else => return error.InvalidNodeType,
+                }
+            }
+        },
+        else => return error.InvalidNodeType,
+    }
+}
 
-// test "insert into a last_level node, difference in last byte of stem" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     try root.insert([_]u8{0} ** 30 ++ [2]u8{ 1, 0 }, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
+test "insert into a last_level node, difference in last byte of stem" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([_]u8{0} ** 30 ++ [2]u8{ 1, 0 }, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
 
-//     var br: *BranchNode = root.branch;
-//     while (true) {
-//         if (br.depth < 30) {
-//             for (br.children, 0..) |child, i| {
-//                 if (i == 0) try testing.expect(child == .branch) else try testing.expect(child == .empty);
-//             }
-//             br = br.children[0].branch;
-//         } else if (br.depth == 30) {
-//             for (br.children, 0..) |child, i| {
-//                 if (i < 2) try testing.expect(child == .last_level) else try testing.expect(child == .empty);
-//             }
-//             break;
-//         } else {
-//             try testing.expect(false);
-//         }
-//     }
-// }
+    var br: *BranchNode = root.branch;
+    while (true) {
+        if (br.depth < 30) {
+            for (br.children, 0..) |child, i| {
+                if (i == 0) try testing.expect(child == .branch) else try testing.expect(child == .empty);
+            }
+            br = br.children[0].branch;
+        } else if (br.depth == 30) {
+            for (br.children, 0..) |child, i| {
+                if (i < 2) try testing.expect(child == .last_level) else try testing.expect(child == .empty);
+            }
+            break;
+        } else {
+            try testing.expect(false);
+        }
+    }
+}
 
-// test "insert into a branch node" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
+test "insert into a branch node" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
 
-//     var br: *BranchNode = root.branch;
-//     try testing.expect(br.children[0] == .last_level);
-//     try testing.expect(br.children[1] == .last_level);
-//     var i: usize = 2;
-//     while (i < 256) : (i += 1) {
-//         try testing.expect(br.children[i] == .empty);
-//     }
-// }
+    var br: *BranchNode = root.branch;
+    try testing.expect(br.children[0] == .last_level);
+    try testing.expect(br.children[1] == .last_level);
+    var i: usize = 2;
+    while (i < 256) : (i += 1) {
+        try testing.expect(br.children[i] == .empty);
+    }
+}
 
-// test "compute root commitment of a last_level node" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{1} ** 32, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
-//     _ = try root.commitment();
-// }
+test "compute root commitment of a last_level node" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{1} ** 32, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
+    _ = try root.commitment();
+}
 
-// test "compute root commitment of a last_level node, with 0 key" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
-//     _ = try root.commitment();
-// }
+test "compute root commitment of a last_level node, with 0 key" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
+    _ = try root.commitment();
+}
 
-// test "compute root commitment of a branch node" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     var value = [_]u8{0} ** 32;
-//     try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
-//     try root.insert([_]u8{1} ** 32, &value, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
-//     _ = try root.commitment();
-// }
+test "compute root commitment of a branch node" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    var value = [_]u8{0} ** 32;
+    try root.insert([_]u8{0} ** 32, &value, testing.allocator, &crs);
+    try root.insert([_]u8{1} ** 32, &value, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
+    _ = try root.commitment();
+}
 
-// test "get inserted value from a tree" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     var key1 = [_]u8{0} ** 32;
-//     var value1 = [_]u8{11} ** 32;
-//     try root.insert(key1, &value1, testing.allocator, &crs);
-//     var key2 = [1]u8{1} ++ [_]u8{0} ** 31;
-//     var value2 = [_]u8{22} ** 32;
-//     try root.insert(key2, &value2, testing.allocator, &crs);
-//     defer root.tear_down(testing.allocator);
+test "get inserted value from a tree" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    var key1 = [_]u8{0} ** 32;
+    var value1 = [_]u8{11} ** 32;
+    try root.insert(key1, &value1, testing.allocator, &crs);
+    var key2 = [1]u8{1} ++ [_]u8{0} ** 31;
+    var value2 = [_]u8{22} ** 32;
+    try root.insert(key2, &value2, testing.allocator, &crs);
+    defer root.tear_down(testing.allocator);
 
-//     var val = try root.get(key1);
-//     _ = try testing.expect(val != null);
-//     _ = try testing.expect(std.mem.eql(u8, val.?, &value1));
-//     val = try root.get(key2);
-//     _ = try testing.expect(val != null);
-//     _ = try testing.expect(std.mem.eql(u8, val.?, &value2));
-// }
+    var val = try root.get(key1);
+    _ = try testing.expect(val != null);
+    _ = try testing.expect(std.mem.eql(u8, val.?, &value1));
+    val = try root.get(key2);
+    _ = try testing.expect(val != null);
+    _ = try testing.expect(std.mem.eql(u8, val.?, &value2));
+}
 
-// test "check verkle-crypto can be imported" {
-//     const expect = testing.expect;
+test "check verkle-crypto can be imported" {
+    const expect = testing.expect;
 
-//     var point = Element.generator();
+    var point = Element.generator();
 
-//     try expect(Element.equal(point, Element.generator()));
+    try expect(Element.equal(point, Element.generator()));
 
-//     Element.double(&point, point);
+    Element.double(&point, point);
 
-//     try expect(!Element.equal(point, Element.generator()));
-// }
+    try expect(!Element.equal(point, Element.generator()));
+}
 
-// test "compatibility with go-verkle" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     defer root.tear_down(testing.allocator);
+test "compatibility with go-verkle" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    defer root.tear_down(testing.allocator);
 
-//     // step 1: try an empty tree
-//     const r = try root.commitment();
-//     const r_bytes = r.toBytes();
+    // step 1: try an empty tree
+    const r = try root.commitment();
+    const r_bytes = r.toBytes();
 
-//     const empty_root = [_]u8{0} ** 32;
+    const empty_root = [_]u8{0} ** 32;
 
-//     try std.testing.expectEqual(empty_root, r_bytes);
-//     const zero_key = [_]u8{0} ** 32;
+    try std.testing.expectEqual(empty_root, r_bytes);
+    const zero_key = [_]u8{0} ** 32;
 
-//     try root.insert(zero_key, &zero_key, testing.allocator, &crs);
+    try root.insert(zero_key, &zero_key, testing.allocator, &crs);
 
-//     const r_single = try root.commitment();
-//     const r_single_bytes = r_single.toBytes();
+    const r_single = try root.commitment();
+    const r_single_bytes = r_single.toBytes();
 
-//     var single_leaf_root: [32]u8 = undefined;
-//     _ = try std.fmt.hexToBytes(single_leaf_root[0..], "6b630905ce275e39f223e175242df2c1e8395e6f46ec71dce5557012c1334a5c");
+    var single_leaf_root: [32]u8 = undefined;
+    _ = try std.fmt.hexToBytes(single_leaf_root[0..], "6b630905ce275e39f223e175242df2c1e8395e6f46ec71dce5557012c1334a5c");
 
-//     try std.testing.expectEqual(single_leaf_root, r_single_bytes);
-// }
+    try std.testing.expectEqual(single_leaf_root, r_single_bytes);
+}
 
-// test "compare simple tree root with that of rust implementation" {
-//     var crs = try CRS.init(testing.allocator);
-//     defer crs.deinit();
-//     var root_ = try Node.new(testing.allocator, &crs);
-//     var root = &root_;
-//     defer root.tear_down(testing.allocator);
+test "compare simple tree root with that of rust implementation" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = try Node.new(testing.allocator, &crs);
+    var root = &root_;
+    defer root.tear_down(testing.allocator);
 
-//     const test_account_keys = [_]Key{
-//         Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 0 },
-//         Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 1 },
-//         Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 2 },
-//         Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 3 },
-//         Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 4 },
-//     };
-//     const test_account_values = [_]*const Slot{
-//         &Slot{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-//         &Slot{ 0, 0, 100, 167, 179, 182, 224, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-//         &Slot{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-//         &Slot{ 197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125, 178, 220, 199, 3, 192, 229, 0, 182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112 },
-//         &Slot{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-//     };
+    const test_account_keys = [_]Key{
+        Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 0 },
+        Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 1 },
+        Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 2 },
+        Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 3 },
+        Key{ 245, 110, 100, 66, 36, 244, 87, 100, 144, 207, 224, 222, 20, 36, 164, 83, 34, 18, 82, 155, 254, 55, 71, 19, 216, 78, 125, 126, 142, 146, 114, 4 },
+    };
+    const test_account_values = [_]*const Slot{
+        &Slot{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        &Slot{ 0, 0, 100, 167, 179, 182, 224, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        &Slot{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+        &Slot{ 197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125, 178, 220, 199, 3, 192, 229, 0, 182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112 },
+        &Slot{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    };
 
-//     for (test_account_keys, 0..) |key, i| {
-//         try root.insert(key, test_account_values[i], testing.allocator, &crs);
-//     }
+    for (test_account_keys, 0..) |key, i| {
+        try root.insert(key, test_account_values[i], testing.allocator, &crs);
+    }
 
-//     const rust_root_comm = [_]u8{ 16, 237, 137, 216, 144, 71, 187, 22, 139, 170, 78, 105, 184, 96, 126, 38, 0, 73, 233, 40, 221, 188, 178, 253, 210, 62, 160, 244, 24, 43, 31, 138 };
+    const rust_root_comm = [_]u8{ 16, 237, 137, 216, 144, 71, 187, 22, 139, 170, 78, 105, 184, 96, 126, 38, 0, 73, 233, 40, 221, 188, 178, 253, 210, 62, 160, 244, 24, 43, 31, 138 };
 
-//     const r = try root.commitment();
+    const r = try root.commitment();
 
-//     const r_bytes = r.toBytes();
+    const r_bytes = r.toBytes();
 
-//     try std.testing.expectEqual(rust_root_comm, r_bytes);
-// }
+    try std.testing.expectEqual(rust_root_comm, r_bytes);
+}
