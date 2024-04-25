@@ -1,7 +1,7 @@
 const std = @import("std");
-const Builder = std.build.Builder;
+const Build = std.Build;
 
-pub fn build(b: *Builder) void {
+pub fn build(b: *Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const lib = b.addStaticLibrary(.{
@@ -23,7 +23,7 @@ pub fn build(b: *Builder) void {
         .target = target,
         .optimize = optimize,
     });
-    to_dot_exe.addModule("verkle-crypto", verkle_crypto.module("verkle-crypto"));
+    to_dot_exe.root_module.addImport("verkle-crypto", verkle_crypto.module("verkle-crypto"));
     to_dot_exe.linkLibrary(verkle_crypto.artifact("verkle-crypto"));
     var to_dot = b.addRunArtifact(to_dot_exe);
     const to_dot_step = b.step("to_dot", "Dump dot file");
@@ -34,7 +34,7 @@ pub fn build(b: *Builder) void {
         .target = target,
         .optimize = optimize,
     });
-    t.addModule("verkle-crypto", verkle_crypto.module("verkle-crypto"));
+    t.root_module.addImport("verkle-crypto", verkle_crypto.module("verkle-crypto"));
     var main_tests = b.addRunArtifact(t);
 
     const test_step = b.step("test", "Run library tests");
