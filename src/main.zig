@@ -7,7 +7,7 @@ const banderwagon = verkle_crypto.banderwagon;
 const Element = banderwagon.Element;
 const Fr = banderwagon.Fr;
 const CRS = verkle_crypto.crs.CRS;
-const copy = std.mem.copy;
+const copyForwards = std.mem.copyForwards;
 const types = @import("./types.zig");
 
 const Slot = types.Slot;
@@ -61,12 +61,12 @@ const LastLevelNode = struct {
                 var data: [Fr.BytesSize]u8 = [_]u8{0} ** Fr.BytesSize;
 
                 // lsb
-                copy(u8, data[0..16], value.?[0..16]);
+                copyForwards(u8, data[0..16], value.?[0..16]);
                 data[16] = 1; // leaf marker
                 vals[2 * i] = Fr.fromBytes(data);
 
                 // msb
-                copy(u8, data[0..16], value.?[16..]);
+                copyForwards(u8, data[0..16], value.?[16..]);
                 data[16] = 0; // clear leaf marker
                 vals[2 * i + 1] = Fr.fromBytes(data);
             } else {
@@ -93,7 +93,7 @@ const LastLevelNode = struct {
         vals[0] = Fr.fromInteger(1);
 
         var stem = [_]u8{0} ** Fr.BytesSize;
-        copy(u8, stem[0..], self.stem[0..31]);
+        copyForwards(u8, stem[0..], self.stem[0..31]);
         vals[1] = Fr.fromBytes(stem);
 
         const c1 = try computeSuffixNodeCommitment(self.crs, self.values[0..128]);
@@ -174,9 +174,9 @@ fn newll(key: Key, value: *const Slot, allocator: Allocator, crs: *CRS) !*LastLe
     var ll = try allocator.create(LastLevelNode);
     ll.values = [_]?*Slot{null} ** 256;
     ll.stem = [_]u8{0} ** 31;
-    copy(u8, ll.stem[0..], key[0..31]);
+    copyForwards(u8, ll.stem[0..], key[0..31]);
     ll.values[slot] = try allocator.create(Slot);
-    copy(u8, ll.values[slot].?[0..], value[0..]);
+    copyForwards(u8, ll.values[slot].?[0..], value[0..]);
     ll.crs = crs;
     return ll;
 }
@@ -186,7 +186,7 @@ fn newemptyll(stem: Stem, depth: u8, allocator: Allocator, crs: *CRS) !*LastLeve
     ll.values = [_]?*Slot{null} ** 256;
     ll.stem = [_]u8{0} ** 31;
     ll.depth = depth;
-    std.mem.copy(u8, ll.stem[0..], stem[0..31]);
+    std.mem.copyForwards(u8, ll.stem[0..], stem[0..31]);
     ll.crs = crs;
     return ll;
 }
@@ -255,7 +255,7 @@ const Node = union(enum) {
                 const diffidx = std.mem.indexOfDiff(u8, ll.stem[0..], key[0..31]);
                 if (diffidx == null) {
                     ll.values[key[31]] = try allocator.create(Slot);
-                    copy(u8, ll.values[key[31]].?[0..], value[0..]);
+                    copyForwards(u8, ll.values[key[31]].?[0..], value[0..]);
                     return;
                 }
 
@@ -524,7 +524,7 @@ pub fn preTreeFromWitness(parent_root_comm: *Element, statediffs: StateDiffs, de
                     // will be left to `null` if suffix_dixx.current_value is `null`.
                     if (suffix_diff.current_value) |sdiff| {
                         ll.values[suffix_diff.suffix] = try alloc.create(Slot);
-                        std.mem.copy(u8, ll.values[suffix_diff.suffix].?, &sdiff);
+                        std.mem.copyForwards(u8, ll.values[suffix_diff.suffix].?, &sdiff);
                     }
 
                     // consume another commitment if c1 or c2 is needed, and hasn't been set.
