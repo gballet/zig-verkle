@@ -252,8 +252,30 @@ const Node = union(enum) {
                 return br.children[key[br.depth]].insert_with_depth(key, value, allocator, depth + 1, crs);
             },
             .branch => |br| br.children[key[br.depth]].insert(key, value, allocator, br.crs),
-            // TODO : implement
-            .poa_stub => return error.ErrTODO,
+            .poa_stub => |stub| {
+                if (depth == 31) {
+                    // Someone tried to insert a full leaf into a stub
+                    // this is either a bug or an attack, return an
+                    // error.
+                    return error.CanNotOverwriteStub;
+                }
+                // recursively insert as many nodes as necessary: start by turning
+                // the current child into a branch node, then figure out if it is
+                // where the stub and the key split.
+                var br = try allocator.create(BranchNode);
+                br.children = [_]Node{Node{ .empty = .{} }} ** 256;
+                br.depth = depth;
+                br.count = 2;
+                br.children[stub.stem[depth]] = Node{ .poa_stub = stub };
+                br.crs = crs;
+                self.* = @unionInit(Node, "branch", br);
+
+                // Recurse. If the stem and the stub have the same byte at this depth,
+                // it will recurse into the stub and create a new branch node. If not,
+                // then this is where the split occurs: it will insert the new leaf by
+                // recursing into an empty value.
+                return br.children[key[depth]].insert_with_depth(key, value, allocator, depth + 1, crs);
+            },
         };
     }
 
@@ -925,4 +947,14 @@ test "compare simple tree root with that of rust implementation" {
     const r_bytes = r.toBytes();
 
     try std.testing.expectEqual(rust_root_comm, r_bytes);
+}
+
+test "insert into poa stub" {
+    var crs = try CRS.init(testing.allocator);
+    defer crs.deinit();
+    var root_ = Node{ .poa_stub = .{ .stem = [_]u8{0xff} ** 31 } };
+    var root: *Node = &root_;
+    var value = [_]u8{0} ** 32;
+    root.insert([_]u8{0xff} ** 3 ++ [_]u8{0} ** 29, value, testing.allocator, &crs);
+    try testing.expectError(error.CanNotOverrideStub, root.insert([_]u8{0xff} ** 32, &value, testing.allocator, &crs));
 }
