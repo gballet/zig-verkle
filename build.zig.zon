@@ -3,8 +3,8 @@
     .version = "0.0.1-beta-0",
     .dependencies = .{
         .@"verkle-crypto" = .{
-            .url = "https://github.com/jsign/verkle-crypto/archive/refs/tags/v0.1.1.tar.gz",
-            .hash = "1220ff87ab551460e55e4db7e4492284b259b3f2fec26bff2114153f15ff1085d6c7",
+            .url = "https://github.com/jsign/verkle-crypto/archive/refs/tags/v0.1.2.tar.gz",
+            .hash = "1220b9a0d6d2aff2a05e911b6c91b5f420fb3f15a75bf0d1e36f140d37f0538715e3",
         },
     },
     .paths = .{""},
