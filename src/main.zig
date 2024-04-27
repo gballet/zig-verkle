@@ -108,7 +108,7 @@ const LastLevelNode = struct {
     fn get_proof_items(self: *const LastLevelNode, keys: []Key) !ProofItems {
         var has_c1 = false;
         var has_c2 = false;
-        var proof_items = ProofItems{};
+        const proof_items = ProofItems{};
         for (keys) |key| {
             if (key[31] < 128 and !has_c1) {
                 has_c1 = true;
@@ -153,7 +153,7 @@ const BranchNode = struct {
     }
 
     fn get_proof_items(self: *const BranchNode, keys: []Key) !ProofItems {
-        var groupstart = 0;
+        const groupstart = 0;
         // TODO initialize with my proof info
         var proof_items = ProofItems{};
         while (groupstart < keys.len) {
@@ -810,7 +810,7 @@ test "insert into a branch node" {
     try root.insert([1]u8{1} ++ [_]u8{0} ** 31, &value, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
 
-    var br: *BranchNode = root.branch;
+    const br: *BranchNode = root.branch;
     try testing.expect(br.children[0] == .last_level);
     try testing.expect(br.children[1] == .last_level);
     var i: usize = 2;
@@ -858,10 +858,10 @@ test "get inserted value from a tree" {
     defer crs.deinit();
     var root_ = try Node.new(testing.allocator, &crs);
     var root = &root_;
-    var key1 = [_]u8{0} ** 32;
+    const key1 = [_]u8{0} ** 32;
     var value1 = [_]u8{11} ** 32;
     try root.insert(key1, &value1, testing.allocator, &crs);
-    var key2 = [1]u8{1} ++ [_]u8{0} ** 31;
+    const key2 = [1]u8{1} ++ [_]u8{0} ** 31;
     var value2 = [_]u8{22} ** 32;
     try root.insert(key2, &value2, testing.allocator, &crs);
     defer root.tear_down(testing.allocator);
