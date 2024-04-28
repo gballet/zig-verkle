@@ -952,7 +952,7 @@ test "compare simple tree root with that of rust implementation" {
 test "insert into poa stub" {
     var crs = try CRS.init(testing.allocator);
     defer crs.deinit();
-    var root_ = Node{ .poa_stub = .{ .stem = [_]u8{0xff} ** 31 } };
+    var root_ = Node{ .poa_stub = .{ .stem = &[_]u8{0xff} ** 31 } };
     var root: *Node = &root_;
     var value = [_]u8{0} ** 32;
     root.insert([_]u8{0xff} ** 3 ++ [_]u8{0} ** 29, value, testing.allocator, &crs);
