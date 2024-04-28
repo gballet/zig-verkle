@@ -9,36 +9,15 @@ const Fr = banderwagon.Fr;
 const CRS = verkle_crypto.crs.CRS;
 const copyForwards = std.mem.copyForwards;
 const types = @import("./types.zig");
+const proof = @import("./proof.zig");
 
 const Slot = types.Slot;
 const Stem = types.Stem;
 const Key = types.Key;
 const Hash = types.Hash;
 
-const ExtStatus = enum {
-    Empty,
-    Other,
-    Present,
-};
-
-const ProofItems = struct {
-    cis: ArrayList(*Element),
-    yis: ArrayList(?Fr),
-    zis: ArrayList(u8),
-    // don't support stateful proofs just yet
-    // fis: *ArrayList(ArrayList(*Fr)),
-
-    esses: ArrayList(u8),
-    poas: ArrayList(Stem),
-    values: ArrayList(?*Slot),
-
-    const Self = @This();
-
-    fn merge(self: *ProofItems, other: *const ProofItems) !void {
-        _ = other;
-        _ = self;
-    }
-};
+const ExtStatus = proof.ExtStatus;
+const ProofItems = proof.ProofItems;
 
 const LastLevelNode = struct {
     // TODO remove pointer
