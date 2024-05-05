@@ -102,3 +102,31 @@ jobs:
       - name: Test
         if: env.HAS_QEMU_RISCV64 == 'true'
         run:  zig build test -Dtarget="riscv64-linux"
+        
+  build-riscv32:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+    
+      - name: Set up Zig
+        uses: korandoru/setup-zig@v1
+        with:
+          zig-version: 0.12.0
+    
+      - name: Check for presence of qemu-riscv32
+        run: |
+          if [[ `which qemu-riscv32` != '' ]]; then
+            echo "HAS_QEMU_RISCV32=true" >> "$GITHUB_ENV"
+          else 
+            echo "HAS_QEMU_RISCV32=false" >> "$GITHUB_ENV"
+          fi
+      
+      - name: Get submodules
+        run: git submodule update --init --recursive
+        
+      - name: Build
+        run:  zig build -Dtarget="riscv32-linux"
+
+      - name: Test
+        if: env.HAS_QEMU_RISCV32 == 'true'
+        run:  zig build test -Dtarget="riscv32-linux"
