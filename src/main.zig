@@ -954,7 +954,8 @@ test "insert into poa stub" {
     defer crs.deinit();
     var root_ = Node{ .poa_stub = .{ .stem = &[_]u8{0xff} ** 31, .commitment = null } };
     var root: *Node = &root_;
+    defer root.tear_down(testing.allocator);
     var value = [_]u8{0} ** 32;
     try root.insert([_]u8{0xff} ** 3 ++ [_]u8{0} ** 29, &value, testing.allocator, &crs);
-    try testing.expectError(error.CanNotOverrideStub, root.insert([_]u8{0xff} ** 32, &value, testing.allocator, &crs));
+    try testing.expectError(error.CanNotOverwriteStub, root.insert([_]u8{0xff} ** 32, &value, testing.allocator, &crs));
 }
