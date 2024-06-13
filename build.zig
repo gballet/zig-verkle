@@ -17,17 +17,17 @@ pub fn build(b: *Build) void {
         .optimize = optimize,
     });
 
-    const to_dot_exe = b.addExecutable(.{
-        .name = "to_dot",
-        .root_source_file = .{ .path = "src/to_dot.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    to_dot_exe.root_module.addImport("verkle-crypto", verkle_crypto.module("verkle-crypto"));
-    to_dot_exe.linkLibrary(verkle_crypto.artifact("verkle-crypto"));
-    var to_dot = b.addRunArtifact(to_dot_exe);
-    const to_dot_step = b.step("to_dot", "Dump dot file");
-    to_dot_step.dependOn(&to_dot.step);
+    // const to_dot_exe = b.addExecutable(.{
+    //     .name = "to_dot",
+    //     .root_source_file = .{ .cwd_relative = "src/to_dot.zig" },
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // to_dot_exe.root_module.addImport("verkle-crypto", verkle_crypto.module("verkle-crypto"));
+    // to_dot_exe.linkLibrary(verkle_crypto.artifact("verkle-crypto"));
+    // var to_dot = b.addRunArtifact(to_dot_exe);
+    // const to_dot_step = b.step("to_dot", "Dump dot file");
+    // to_dot_step.dependOn(&to_dot.step);
 
     const t = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
