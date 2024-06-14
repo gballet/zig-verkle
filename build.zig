@@ -6,7 +6,7 @@ pub fn build(b: *Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const lib = b.addStaticLibrary(.{
         .name = "verkle",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -29,13 +29,13 @@ pub fn build(b: *Build) void {
     // const to_dot_step = b.step("to_dot", "Dump dot file");
     // to_dot_step.dependOn(&to_dot.step);
 
-    const t = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+    const unit_tests = b.addTest(.{
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    t.root_module.addImport("verkle-crypto", verkle_crypto.module("verkle-crypto"));
-    var main_tests = b.addRunArtifact(t);
+    unit_tests.root_module.addImport("verkle-crypto", verkle_crypto.module("verkle-crypto"));
+    var main_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&main_tests.step);
